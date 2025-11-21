@@ -1,7 +1,15 @@
+# -*- coding: utf-8 -*-
 """
-Database Models for VibeSurf Backend - With LLM Profile Management
+VibeSurf后端数据库模型定义
 
-SQLAlchemy models for task execution system with LLM profile management.
+这个模块定义了VibeSurf后端系统的所有SQLAlchemy数据库模型，
+包括任务管理、LLM配置文件、语音配置文件等核心数据结构。
+
+主要模型：
+- Task: 任务执行记录
+- LLMProfile: LLM模型配置管理
+- VoiceProfile: 语音模型配置管理
+- 支持加密存储API密钥
 """
 
 from sqlalchemy import Column, String, Text, DateTime, Enum, JSON, Boolean, Index, BigInteger
@@ -11,47 +19,58 @@ from datetime import datetime
 import enum
 from uuid import uuid4
 
+# 声明式基类
 Base = declarative_base()
 
-# Enums for type safety
+# 枚举类型定义，用于类型安全
 class TaskStatus(enum.Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    PAUSED = "paused"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    STOPPED = "stopped"
+    """任务状态枚举"""
+    PENDING = "pending"       # 待执行
+    RUNNING = "running"       # 运行中
+    PAUSED = "paused"         # 已暂停
+    COMPLETED = "completed"   # 已完成
+    FAILED = "failed"         # 执行失败
+    STOPPED = "stopped"       # 已停止
 
 class VoiceModelType(enum.Enum):
-    ASR = "asr"
-    TTS = "tts"
+    """语音模型类型枚举"""
+    ASR = "asr"   # 语音识别
+    TTS = "tts"   # 语音合成
 
 class VoiceProfile(Base):
-    """Voice Profile model for managing voice model configurations with encrypted API keys"""
+    """
+    语音配置文件模型
+
+    管理语音识别(ASR)和语音合成(TTS)模型的配置信息，
+    支持加密存储API密钥，保护敏感信息安全。
+
+    表结构：voice_profiles
+    """
     __tablename__ = 'voice_profiles'
-    
-    # Primary identifier
+
+    # 主键标识符
     profile_id = Column(String(36), primary_key=True, default=lambda: str(uuid4()))
-    voice_profile_name = Column(String(100), nullable=False, unique=True)  # User-defined unique name
-    
-    # Voice Model Configuration
-    voice_model_type = Column(Enum(VoiceModelType, values_callable=lambda obj: [e.value for e in obj]), nullable=False)  # asr or tts
-    voice_model_name = Column(String(100), nullable=False)
-    encrypted_api_key = Column(Text, nullable=True)  # Encrypted API key using MAC address
-    
-    # Voice model parameters (stored as JSON to allow flexibility)
-    voice_meta_params = Column(JSON, nullable=True)  # Model-specific parameters
-    
-    # Profile metadata
-    description = Column(Text, nullable=True)
-    is_active = Column(Boolean, default=True, nullable=False)
-    
-    # Timestamps
-    created_at = Column(DateTime, nullable=False, default=func.now())
-    updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())
-    last_used_at = Column(DateTime, nullable=True)
-    
+    voice_profile_name = Column(String(100), nullable=False, unique=True)  # 用户定义的唯一名称
+
+    # 语音模型配置
+    voice_model_type = Column(Enum(VoiceModelType, values_callable=lambda obj: [e.value for e in obj]), nullable=False)  # 语音模型类型：asr或tts
+    voice_model_name = Column(String(100), nullable=False)                   # 模型名称
+    encrypted_api_key = Column(Text, nullable=True)                          # 使用MAC地址加密的API密钥
+
+    # 语音模型参数（以JSON格式存储，提供灵活性）
+    voice_meta_params = Column(JSON, nullable=True)                          # 模型特定参数
+
+    # 配置文件元数据
+    description = Column(Text, nullable=True)                                 # 配置文件描述
+    is_active = Column(Boolean, default=True, nullable=False)               # 是否激活
+
+    # 时间戳字段
+    created_at = Column(DateTime, nullable=False, default=func.now())        # 创建时间
+    updated_at = Column(DateTime, nullable=False, default=func.now(), onupdate=func.now())  # 更新时间
+    last_used_at = Column(DateTime, nullable=True)                           # 最后使用时间
+
     def __repr__(self):
+        """字符串表示"""
         return f"<VoiceProfile(voice_profile_name={self.voice_profile_name}, voice_model_name={self.voice_model_name}, type={self.voice_model_type.value})>"
 
 class LLMProfile(Base):

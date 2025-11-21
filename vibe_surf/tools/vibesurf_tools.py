@@ -1,3 +1,20 @@
+# -*- coding: utf-8 -*-
+"""
+VibeSurf工具集成管理器
+
+这是VibeSurf项目的核心工具集成模块，提供统一的工具管理、
+注册和执行框架。支持MCP协议、Composio集成、文件系统操作、
+金融数据获取、浏览器工具扩展等多种工具生态。
+
+核心功能：
+- 统一工具注册和管理系统
+- MCP（Model Context Protocol）客户端集成
+- Composio第三方服务集成
+- 自定义文件系统操作
+- 金融数据获取和处理
+- 浏览器自动化工具扩展
+"""
+
 from typing import Any, Generic, TypeVar
 from browser_use.tools.registry.service import Registry
 from pydantic import BaseModel
@@ -28,6 +45,8 @@ from browser_use.dom.service import EnhancedDOMTreeNode
 from browser_use.browser.views import BrowserError
 from browser_use.mcp.client import MCPClient
 from browser_use.tools.views import NoParamsAction
+
+# VibeSurf内部工具导入
 from vibe_surf.browser.agent_browser_session import AgentBrowserSession
 from vibe_surf.tools.views import HoverAction, ExtractionAction, FileExtractionAction, BrowserUseAgentExecution, \
     ReportWriterTask, TodoGenerateAction, TodoModifyAction, VibeSurfDoneAction, SkillSearchAction, SkillCrawlAction, \
@@ -47,6 +66,7 @@ from vibe_surf.tools.utils import _extract_structured_content, _rank_search_resu
 
 logger = get_logger(__name__)
 
+# 类型变量定义
 Context = TypeVar('Context')
 
 T = TypeVar('T', bound=BaseModel)

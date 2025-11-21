@@ -1,14 +1,29 @@
+# -*- coding: utf-8 -*-
 """
-VibeSurf Backend API
+VibeSurf后端API服务主入口
 
-uvicorn backend.main:app --host 127.0.0.1 --port 9335
+这是VibeSurf项目的后端核心服务，基于FastAPI框架构建。
+提供RESTful API接口，支持任务管理、代理协调、文件处理、
+浏览器控制和LangFlow集成等功能。
 
-FastAPI application for simplified single-task execution model with Langflow integration.
+启动命令：
+uvicorn vibe_surf.backend.main:app --host 127.0.0.1 --port 9335
+
+主要特性：
+- 基于FastAPI的高性能异步Web服务
+- 完整的任务生命周期管理
+- 与LangFlow的深度集成
+- 实时代理控制和状态监控
+- 文件上传下载支持
+- 浏览器自动化接口
+- 语音服务集成
 """
+
 import pdb
 
 from dotenv import load_dotenv
 
+# 加载环境变量配置
 load_dotenv()
 
 import os
@@ -54,27 +69,44 @@ from vibe_surf.telemetry.views import BackendTelemetryEvent
 
 logger = get_logger(__name__)
 
-# Global variables to control background tasks
-browser_monitor_task = None
-langflow_init_task = None
-sync_flows_from_fs_task = None
-mcp_init_task = None
-component_cache_task = None
-schedule_manager_task = None
+# 全局后台任务控制变量
+browser_monitor_task = None          # 浏览器监控任务
+langflow_init_task = None            # LangFlow初始化任务
+sync_flows_from_fs_task = None       # 文件系统流程同步任务
+mcp_init_task = None                 # MCP服务器初始化任务
+component_cache_task = None          # 组件缓存任务
+schedule_manager_task = None         # 调度管理器任务
 
 
 def configure_langflow_envs():
-    # langflow setup envs
+    """
+    配置LangFlow运行环境变量
+
+    设置LangFlow运行所需的环境变量，包括数据库连接、
+    认证配置、日志设置等。确保LangFlow组件能够正常初始化和运行。
+
+    配置项：
+        - LANGFLOW_DATABASE_URL: SQLite数据库连接
+        - LANGFLOW_SKIP_AUTH_AUTO_LOGIN: 跳过自动登录
+        - LANGFLOW_AUTO_LOGIN: 启用自动登录
+        - LANGFLOW_LOG_FILE: 日志文件路径
+        - LANGFLOW_LOG_LEVEL: 日志级别
+    """
     from vibe_surf import common
     workspace_dir = common.get_workspace_dir()
     os.makedirs(workspace_dir, exist_ok=True)
     current_date = datetime.now().strftime("%Y-%m-%d")
 
+    # 配置数据库连接
     langflow_db_path = str(Path(workspace_dir) / 'langflow.db')
     os.environ["LANGFLOW_DATABASE_URL"] = f"sqlite:///{langflow_db_path}"
     logger.info(f"Langflow database: {os.environ['LANGFLOW_DATABASE_URL']}")
+
+    # 配置认证设置
     os.environ["LANGFLOW_SKIP_AUTH_AUTO_LOGIN"] = "true"
     os.environ["LANGFLOW_AUTO_LOGIN"] = "true"
+
+    # 配置日志系统
     os.environ["LANGFLOW_LOG_FILE"] = os.path.join(workspace_dir, "logs", f'langflow_{current_date}.log')
     os.environ["LANGFLOW_LOG_LEVEL"] = "debug" if os.environ.get("VIBESURF_DEBUG", "false").lower() in ['1', 'true',
                                                                                                         'yes'] else "info"

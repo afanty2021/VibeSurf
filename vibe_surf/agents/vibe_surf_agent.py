@@ -1,3 +1,20 @@
+# -*- coding: utf-8 -*-
+"""
+VibeSurf智能代理主协调器
+
+这个模块是VibeSurf项目的核心组件，负责管理多代理工作流。
+基于LangGraph框架实现状态图驱动的工作流编排，支持浏览器自动化、
+任务规划、并行执行和报告生成等功能。
+
+主要特性：
+- 基于LangGraph的状态机工作流
+- 多代理协调和并行执行
+- 浏览器自动化任务管理
+- 实时控制和状态监控
+- 完整的错误处理和恢复机制
+- 详细的遥测数据收集
+"""
+
 import asyncio
 import copy
 import json
@@ -20,12 +37,14 @@ from langgraph.checkpoint.memory import MemorySaver
 from pydantic import BaseModel, Field
 from json_repair import repair_json
 
+# Browser-Use框架相关导入
 from browser_use.browser.session import BrowserSession
 from browser_use.llm.base import BaseChatModel
 from browser_use.llm.messages import UserMessage, SystemMessage, BaseMessage, AssistantMessage
 from browser_use.browser.views import TabInfo
 from browser_use.tokens.service import TokenCost
 
+# VibeSurf内部模块导入
 from vibe_surf.agents.browser_use_agent import BrowserUseAgent
 from vibe_surf.agents.report_writer_agent import ReportWriterAgent, ReportTaskResult
 from vibe_surf.agents.views import CustomAgentOutput
@@ -50,164 +69,237 @@ from vibe_surf.telemetry.views import (
 
 from vibe_surf.logger import get_logger
 
+# 初始化日志记录器
 logger = get_logger(__name__)
 
 
 class BrowserTaskResult(BaseModel):
-    """Result from browser task execution"""
-    agent_id: str
-    agent_workdir: str
-    success: bool
-    task: Optional[str] = None
-    result: Optional[str] = None
-    error: Optional[str] = None
-    important_files: Optional[List[str]] = None
+    """
+    浏览器任务执行结果模型
+
+    封装了浏览器自动化任务的执行结果，包括成功状态、输出内容、
+    错误信息以及相关的重要文件列表。用于跟踪和传递浏览器任务
+    的执行状态和结果。
+    """
+    agent_id: str                    # 代理标识符
+    agent_workdir: str               # 代理工作目录
+    success: bool                    # 任务执行成功状态
+    task: Optional[str] = None       # 原始任务描述
+    result: Optional[str] = None     # 任务执行结果
+    error: Optional[str] = None      # 错误信息（如果有）
+    important_files: Optional[List[str]] = None  # 重要文件路径列表
 
 
 class ControlResult(BaseModel):
-    """Result of a control operation"""
-    success: bool
-    message: str
-    timestamp: datetime = Field(default_factory=datetime.now)
-    details: Optional[Dict[str, Any]] = None
+    """
+    控制操作结果模型
+
+    封装了代理控制操作（暂停、恢复、停止等）的执行结果。
+    提供操作状态、消息和详细时间戳信息。
+    """
+    success: bool                              # 操作成功状态
+    message: str                              # 操作结果消息
+    timestamp: datetime = Field(default_factory=datetime.now)  # 操作时间戳
+    details: Optional[Dict[str, Any]] = None  # 操作详细信息
 
 
 class AgentStatus(BaseModel):
-    """Status of an individual agent"""
-    agent_id: str
-    status: Literal["running", "paused", "stopped", "idle", "error"] = "idle"
-    current_action: Optional[str] = None
-    last_update: datetime = Field(default_factory=datetime.now)
-    error_message: Optional[str] = None
-    pause_reason: Optional[str] = None
+    """
+    单个代理状态模型
+
+    跟踪单个代理的运行状态、当前动作、错误信息等。
+    用于监控和管理多代理系统中的各个代理实例。
+    """
+    agent_id: str                                         # 代理唯一标识
+    status: Literal["running", "paused", "stopped", "idle", "error"] = "idle"  # 代理状态
+    current_action: Optional[str] = None                 # 当前正在执行的动作
+    last_update: datetime = Field(default_factory=datetime.now)  # 最后更新时间
+    error_message: Optional[str] = None                  # 错误信息（如果有的话）
+    pause_reason: Optional[str] = None                   # 暂停原因（如果已暂停）
 
 
 class VibeSurfStatus(BaseModel):
-    """Overall status of the vibesurf execution"""
-    overall_status: Literal["running", "paused", "stopped", "idle", "error"] = "idle"
-    agent_statuses: Dict[str, AgentStatus] = Field(default_factory=dict)
-    progress: Dict[str, Any] = Field(default_factory=dict)
-    last_update: datetime = Field(default_factory=datetime.now)
-    active_step: Optional[str] = None
+    """
+    VibeSurf整体执行状态模型
+
+    提供整个VibeSurf系统的状态概览，包括总体状态、
+    各个代理的状态详情以及执行进度信息。
+    """
+    overall_status: Literal["running", "paused", "stopped", "idle", "error"] = "idle"  # 总体状态
+    agent_statuses: Dict[str, AgentStatus] = Field(default_factory=dict)              # 代理状态字典
+    progress: Dict[str, Any] = Field(default_factory=dict)                            # 进度信息
+    last_update: datetime = Field(default_factory=datetime.now)                       # 最后更新时间
+    active_step: Optional[str] = None                                                 # 当前活跃步骤
 
 
 @dataclass
 class VibeSurfState:
-    """LangGraph state for VibeSurfAgent workflow"""
+    """
+    VibeSurf代理工作流状态模型
 
-    # Core task information
-    original_task: str = ""
-    upload_files: List[str] = field(default_factory=list)
-    session_id: str = field(default_factory=lambda: uuid7str())
-    current_workspace_dir: str = "./workspace"
+    这是LangGraph工作流的核心状态管理类，包含了任务执行过程中
+    所有必要的状态信息。支持控制操作（暂停、恢复、停止）和
+    多代理协调。
 
-    # Workflow state
-    current_step: str = "vibesurf_agent"
-    is_complete: bool = False
+    状态流转：
+    vibesurf_agent -> browser_task_execution -> report_task_execution -> END
+    """
 
-    # Current action and parameters from LLM
-    current_action: Optional[str] = None
-    action_params: Optional[Dict[str, Any]] = None
+    # 核心任务信息
+    original_task: str = ""                                        # 原始用户任务描述
+    upload_files: List[str] = field(default_factory=list)          # 用户上传的文件列表
+    session_id: str = field(default_factory=lambda: uuid7str())    # 会话唯一标识符
+    current_workspace_dir: str = "./workspace"                      # 当前工作目录
 
-    # Browser task execution
-    browser_tasks: List[Dict[str, Any]] = field(default_factory=list)
-    browser_results: List[BrowserTaskResult] = field(default_factory=list)
+    # 工作流状态
+    current_step: str = "vibesurf_agent"                           # 当前执行步骤
+    is_complete: bool = False                                      # 任务是否完成
 
-    generated_report_result: Optional[ReportTaskResult] = None
-    
-    # Response outputs
-    final_response: Optional[str] = None
+    # 当前LLM决策的动作和参数
+    current_action: Optional[str] = None                           # 当前动作类型
+    action_params: Optional[Dict[str, Any]] = None                 # 动作参数
 
-    # vibesurf_agent
-    vibesurf_agent: Optional['VibeSurfAgent'] = None
+    # 浏览器任务执行相关
+    browser_tasks: List[Dict[str, Any]] = field(default_factory=list)     # 待执行的浏览器任务列表
+    browser_results: List[BrowserTaskResult] = field(default_factory=list)  # 已完成的浏览器任务结果
 
-    # Control state management
-    paused: bool = False
-    stopped: bool = False
-    should_pause: bool = False
-    should_stop: bool = False
+    # 报告生成相关
+    generated_report_result: Optional[ReportTaskResult] = None      # 生成的报告结果
+
+    # 最终响应输出
+    final_response: Optional[str] = None                           # 任务最终响应
+
+    # VibeSurf代理实例引用
+    vibesurf_agent: Optional['VibeSurfAgent'] = None               # 主代理实例
+
+    # 控制状态管理
+    paused: bool = False                                          # 是否已暂停
+    stopped: bool = False                                         # 是否已停止
+    should_pause: bool = False                                    # 是否应该暂停
+    should_stop: bool = False                                     # 是否应该停止
 
 
 def format_browser_results(browser_results: List[BrowserTaskResult]) -> str:
-    """Format browser results for LLM prompt"""
+    """
+    格式化浏览器任务执行结果，用于LLM提示词
+
+    将浏览器任务的执行结果转换为格式化的字符串，包含成功状态、
+    结果摘要和错误信息。便于主代理理解和处理任务结果。
+
+    Args:
+        browser_results: 浏览器任务结果列表
+
+    Returns:
+        格式化后的结果字符串
+    """
     result_text = []
     for result in browser_results:
+        # 根据成功状态添加不同的图标
         status = "✅ Success" if result.success else "❌ Failed"
         result_text.append(f"{status}: {result.task}")
+
+        # 添加结果摘要（限制长度）
         if result.result:
-            result_text.append(f"  Result: {result.result}...")
+            # 截取结果内容，避免过长
+            result_preview = result.result[:200] + "..." if len(result.result) > 200 else result.result
+            result_text.append(f"  Result: {result_preview}")
+
+        # 添加错误信息
         if result.error:
             result_text.append(f"  Error: {result.error}")
+
     return "\n".join(result_text)
 
 
 def process_agent_msg_file_links(agent_msg: str, agent_name: str, base_dir: Path) -> str:
     """
-    Process file links in agent_msg, converting relative paths to absolute paths
-    
+    处理代理消息中的文件链接，将相对路径转换为绝对路径
+
+    扫描代理消息中的markdown文件链接，将其转换为绝对路径的文件URL。
+    特别处理browser_use_agent的文件路径结构。
+
     Args:
-        agent_msg: The agent message containing potential file links
-        agent_name: Name of the agent (used for special handling of browser_use_agent)
-        base_dir: Base directory path from file_system.get_dir()
-    
+        agent_msg: 包含文件链接的代理消息
+        agent_name: 代理名称（用于特殊处理browser_use_agent）
+        base_dir: 文件系统基础目录路径
+
     Returns:
-        Processed agent_msg with absolute paths
+        处理后的代理消息，包含绝对路径的文件链接
     """
-    # Pattern to match markdown links: [text](path)
+    # 匹配markdown链接的正则表达式：[文本](路径)
     link_pattern = r'\[([^\]]*)\]\(([^)]+)\)'
-    
+
     def replace_link(match):
-        text = match.group(1)
-        path = match.group(2)
-        
-        # Skip if already an absolute path or URL
+        """内部函数：处理单个链接替换"""
+        text = match.group(1)  # 链接文本
+        path = match.group(2)  # 链接路径
+
+        # 如果已经是绝对路径或URL，则跳过处理
         if path.startswith(('http://', 'https://', 'file:///', '/')):
             return match.group(0)
-        
-        # Build absolute path
+
+        # 构建绝对路径
         if agent_name.startswith('browser_use_agent-'):
-            # Extract task_id and index from agent_name
-            # Format: browser_use_agent-{task_id}-{i + 1:03d}
+            # 从代理名称中提取task_id和索引
+            # 格式：browser_use_agent-{task_id}-{i + 1:03d}
             parts = agent_name.split('-')
             if len(parts) >= 3:
                 task_id = parts[1]
                 index = parts[2]
-                # Add the special sub-path for browser_use_agent
+                # 为browser_use_agent添加特殊的子路径
                 sub_path = f"bu_agents/{task_id}-{index}"
                 absolute_path = base_dir / sub_path / path
             else:
                 absolute_path = base_dir / path
         else:
             absolute_path = base_dir / path
-        
-        # Convert to string and normalize separators
+
+        # 转换为字符串并规范化路径分隔符
         abs_path_str = str(absolute_path).replace(os.path.sep, '/')
-        
+
         return f"[{text}](file:///{abs_path_str})"
-    
-    # Replace all file links
+
+    # 替换所有文件链接
     processed_msg = re.sub(link_pattern, replace_link, agent_msg)
     return processed_msg
 
 
 async def log_agent_activity(state: VibeSurfState, agent_name: str, agent_status: str, agent_msg: str) -> None:
-    """Log agent activity to the activity log"""
+    """
+    记录代理活动到活动日志中
+
+    将代理的执行状态、消息内容、令牌使用情况等信息记录到活动日志中。
+    处理文件链接路径转换，确保日志中的文件链接可访问。
+
+    Args:
+        state: VibeSurf工作流状态
+        agent_name: 代理名称
+        agent_status: 代理状态（working, result, error, thinking等）
+        agent_msg: 代理消息内容
+
+    Returns:
+        None
+    """
+    # 获取令牌使用情况摘要
     token_summary = await state.vibesurf_agent.token_cost_service.get_usage_summary()
     token_summary_md = token_summary.model_dump_json(indent=2, exclude_none=True, exclude_unset=True)
     logger.debug(token_summary_md)
 
-    # Process file links in agent_msg to convert relative paths to absolute paths
+    # 处理代理消息中的文件链接，转换为绝对路径
     base_dir = state.vibesurf_agent.file_system.get_dir()
     processed_agent_msg = process_agent_msg_file_links(agent_msg, agent_name, base_dir)
 
+    # 构建活动日志条目
     activity_entry = {
-        "agent_name": agent_name,
-        "agent_status": agent_status,  # working, result, error
-        "agent_msg": processed_agent_msg,
-        "timestamp": datetime.now().isoformat(),
-        "total_tokens": token_summary.total_tokens,
-        "total_cost": token_summary.total_cost
+        "agent_name": agent_name,                                  # 代理名称
+        "agent_status": agent_status,                              # 代理状态
+        "agent_msg": processed_agent_msg,                          # 处理后的消息内容
+        "timestamp": datetime.now().isoformat(),                   # 时间戳
+        "total_tokens": token_summary.total_tokens,                # 总令牌消耗
+        "total_cost": token_summary.total_cost                     # 总成本
     }
+
+    # 添加到活动日志
     state.vibesurf_agent.activity_logs.append(activity_entry)
     logger.debug(f"📝 Logged activity: {agent_name} - {agent_status}:\n{processed_agent_msg}")
 

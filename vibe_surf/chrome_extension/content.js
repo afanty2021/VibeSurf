@@ -1,23 +1,41 @@
-// Content Script - VibeSurf Extension
-// Runs in the context of web pages and can interact with page content
+/**
+ * VibeSurf Chrome扩展内容脚本
+ *
+ * 这是注入到网页中的内容脚本，负责与页面DOM交互、
+ * 执行用户操作、提取页面信息等功能。作为扩展与网页之间的桥梁，
+ * 实现自动化操作和页面分析能力。
+ *
+ * 主要功能：
+ * - 页面内容分析和上下文提取
+ * - DOM元素操作（点击、滚动、高亮）
+ * - 消息通信与后台脚本协调
+ * - 麦克风权限iframe注入
+ * - 页面事件监听和状态同步
+ */
 
 (function() {
   'use strict';
-  
-  // Avoid running multiple times
+
+  // 防止脚本多次加载执行
   if (window.vibeSurfContentLoaded) {
     return;
   }
   window.vibeSurfContentLoaded = true;
-  
-  console.log('[VibeSurf Content] Content script loaded on:', window.location.href);
-  
+
+  console.log('[VibeSurf Content] 内容脚本已加载至页面:', window.location.href);
+
+  /**
+   * VibeSurf内容脚本类
+   *
+   * 管理页面DOM操作和消息通信。提供页面分析、元素操作、
+   * 权限管理等功能，为自动化任务提供页面操作能力。
+   */
   class VibeSurfContent {
     constructor() {
-      this.initialized = false;
-      this.pageContext = null;
-      this.setupMessageListener();
-      this.collectPageContext();
+      this.initialized = false;           // 初始化状态标志
+      this.pageContext = null;             // 页面上下文信息
+      this.setupMessageListener();         // 设置消息监听器
+      this.collectPageContext();           // 收集页面上下文
     }
     
     setupMessageListener() {

@@ -1,8 +1,14 @@
+# -*- coding: utf-8 -*-
 """
-VibeSurf Agent Execution Router
+VibeSurf代理任务执行路由器
 
-Handles task submission, execution control (pause/resume/stop), and status monitoring
-for VibeSurf agents.
+这是任务管理的核心API路由，负责处理任务的提交、执行控制
+（暂停/恢复/停止）和状态监控等功能。
+
+主要端点：
+- GET /tasks/status - 检查任务状态
+- POST /tasks/submit - 提交新任务
+- POST /tasks/control - 任务控制操作
 """
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
@@ -13,10 +19,11 @@ import os
 from datetime import datetime
 from uuid_extensions import uuid7str
 
+# 数据库和模型导入
 from ..database import get_db_session
 from .models import TaskCreateRequest, TaskControlRequest
 
-# Import global variables and functions from shared_state
+# 共享状态管理导入
 from ..shared_state import (
     execute_task_background,
     is_task_running,
@@ -28,6 +35,7 @@ from vibe_surf.logger import get_logger
 
 logger = get_logger(__name__)
 
+# 创建API路由器
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 

@@ -1,13 +1,25 @@
-// Background Script - VibeSurf Extension
-// Handles extension lifecycle, side panel management, and cross-context communication
+/**
+ * VibeSurf Chrome扩展后台脚本
+ *
+ * 这是Chrome扩展的核心后台服务工作者，负责扩展的生命周期管理、
+ * 侧边栏面板控制、跨上下文通信等功能。处理扩展安装、更新、
+ * 消息路由、权限管理等核心操作。
+ *
+ * 主要功能：
+ * - 扩展生命周期管理（安装、启动、更新）
+ * - 侧边栏面板的创建和管理
+ * - 扩展内部消息路由和通信
+ * - 权限管理和状态同步
+ * - 开发模式下的自动重载
+ */
 
-// Load configuration using importScripts for service worker
+// 使用importScripts加载配置（Service Worker兼容方式）
 try {
   importScripts('./config.js');
-  console.log('[VibeSurf] Configuration loaded');
+  console.log('[VibeSurf] 配置加载成功');
 } catch (error) {
-  console.error('[VibeSurf] Failed to load configuration:', error);
-  // Fallback configuration
+  console.error('[VibeSurf] 配置加载失败:', error);
+  // 备用配置
   self.VIBESURF_CONFIG = {
     BACKEND_URL: 'http://127.0.0.1:9335',
     SOCIAL_LINKS: {
@@ -20,11 +32,17 @@ try {
   };
 }
 
+/**
+ * VibeSurf后台脚本类
+ *
+ * 管理Chrome扩展的核心功能，包括事件监听、消息处理、
+ * 侧边栏控制等。作为扩展的中央控制器，协调各个组件的工作。
+ */
 class VibeSurfBackground {
   constructor() {
-    this.isInitialized = false;
-    this.setupEventListeners();
-    this.initDevMode();
+    this.isInitialized = false;               // 初始化状态标志
+    this.setupEventListeners();                // 设置事件监听器
+    this.initDevMode();                       // 初始化开发模式
   }
 
   initDevMode() {

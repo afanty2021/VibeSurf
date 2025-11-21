@@ -1,3 +1,27 @@
+# -*- coding: utf-8 -*-
+"""
+VibeSurf浏览器自动化代理模块
+
+这个模块基于browser-use框架实现了一个强大的浏览器自动化代理，
+专门用于执行Web页面操作任务。该代理集成了视觉识别、自然语言理解
+和复杂的浏览器交互能力。
+
+主要功能：
+- 基于LLM的智能网页操作
+- 视觉元素识别和交互
+- 多标签页管理
+- 文件下载和上传
+- 表单自动填写
+- 动态内容处理
+
+核心特性：
+- 支持多种LLM模型（OpenAI、Claude、本地模型等）
+- 异步执行和并发控制
+- 完整的错误处理和恢复机制
+- 可扩展的工具系统
+- 详细的遥测数据收集
+"""
+
 import asyncio
 import gc
 import inspect
@@ -81,100 +105,135 @@ Context = TypeVar('Context')
 
 
 class BrowserUseAgent(Agent):
+    """
+    VibeSurf浏览器自动化代理类
+
+    这是一个基于browser-use框架的增强型浏览器自动化代理，
+    继承自Agent基类，专门用于执行复杂的Web页面操作任务。
+
+    主要职责：
+    - 解析和理解用户任务描述
+    - 制定浏览器操作策略
+    - 执行页面交互和自动化操作
+    - 处理动态网页内容和JavaScript
+    - 管理文件下载和上传操作
+    - 提供详细的执行反馈和错误报告
+
+    核心特性：
+    - 智能视觉识别：能够识别页面元素并进行精确交互
+    - 自然语言理解：将用户指令转换为具体的浏览器操作
+    - 多标签页管理：支持同时在多个标签页中执行任务
+    - 错误恢复：具备智能的错误处理和重试机制
+    - 扩展性：支持自定义工具和功能扩展
+
+    工作流程：
+    1. 接收任务描述和参数
+    2. 初始化浏览器会话和工具系统
+    3. 分析任务并制定执行计划
+    4. 执行浏览器操作序列
+    5. 收集结果并生成报告
+    6. 清理资源并结束任务
+    """
+
     @time_execution_sync('--init')
     def __init__(
             self,
             task: str,
             llm: BaseChatModel = ChatOpenAI(model='gpt-4.1-mini'),
-            # Optional parameters
-            browser_profile: BrowserProfile | None = None,
-            browser_session: BrowserSession | None = None,
-            browser: Browser | None = None,  # Alias for browser_session
-            tools: Tools[Context] | None = None,
-            controller: Tools[Context] | None = None,  # Alias for tools
-            # Initial agent run parameters
-            sensitive_data: dict[str, str | dict[str, str]] | None = None,
-            initial_actions: list[dict[str, dict[str, Any]]] | None = None,
-            # Cloud Callbacks
+            # Optional parameters - 可选参数
+            browser_profile: BrowserProfile | None = None,           # 浏览器配置文件
+            browser_session: BrowserSession | None = None,          # 浏览器会话
+            browser: Browser | None = None,                         # 浏览器实例（browser_session的别名）
+            tools: Tools[Context] | None = None,                    # 工具集
+            controller: Tools[Context] | None = None,               # 控制器（tools的别名）
+            # Initial agent run parameters - 初始代理运行参数
+            sensitive_data: dict[str, str | dict[str, str]] | None = None,  # 敏感数据（如登录凭证）
+            initial_actions: list[dict[str, dict[str, Any]]] | None = None,  # 初始化操作列表
+            # Cloud Callbacks - 云端回调函数
             register_new_step_callback: (
-                    Callable[['BrowserStateSummary', 'AgentOutput', int], None]  # Sync callback
-                    | Callable[['BrowserStateSummary', 'AgentOutput', int], Awaitable[None]]  # Async callback
+                    Callable[['BrowserStateSummary', 'AgentOutput', int], None]  # 同步回调
+                    | Callable[['BrowserStateSummary', 'AgentOutput', int], Awaitable[None]]  # 异步回调
                     | None
-            ) = None,
+            ) = None,                                               # 新步骤回调函数
             register_done_callback: (
-                    Callable[['AgentHistoryList'], Awaitable[None]]  # Async Callback
-                    | Callable[['AgentHistoryList'], None]  # Sync Callback
+                    Callable[['AgentHistoryList'], Awaitable[None]]  # 异步回调
+                    | Callable[['AgentHistoryList'], None]  # 同步回调
                     | None
-            ) = None,
-            register_external_agent_status_raise_error_callback: Callable[[], Awaitable[bool]] | None = None,
-            register_should_stop_callback: Callable[[], Awaitable[bool]] | None = None,
-            # Agent settings
-            output_model_schema: type[AgentStructuredOutput] | None = None,
-            use_vision: bool = True,
-            save_conversation_path: str | Path | None = None,
-            save_conversation_path_encoding: str | None = 'utf-8',
-            max_failures: int = 3,
-            override_system_message: str | None = None,
-            extend_system_message: str | None = None,
-            generate_gif: bool | str = False,
-            available_file_paths: list[str] | None = None,
-            include_attributes: list[str] | None = None,
-            max_actions_per_step: int = 10,
-            use_thinking: bool = True,
-            flash_mode: bool = False,
-            max_history_items: int | None = None,
-            page_extraction_llm: BaseChatModel | None = None,
-            injected_agent_state: AgentState | None = None,
-            source: str | None = None,
-            file_system_path: str | None = None,
-            task_id: str | None = None,
-            calculate_cost: bool = False,
-            display_files_in_done_text: bool = True,
-            include_tool_call_examples: bool = False,
-            vision_detail_level: Literal['auto', 'low', 'high'] = 'auto',
-            llm_timeout: int = 90,
-            step_timeout: int = 120,
-            directly_open_url: bool = False,
-            include_recent_events: bool = False,
-            sample_images: list[ContentPartTextParam | ContentPartImageParam] | None = None,
-            final_response_after_failure: bool = True,
-            allow_parallel_action_types: list[str] = ["extract", "extract_content_from_file"],
-            _url_shortening_limit: int = 25,
-            token_cost_service: Optional[TokenCost] = None,
+            ) = None,                                               # 任务完成回调函数
+            register_external_agent_status_raise_error_callback: Callable[[], Awaitable[bool]] | None = None,  # 外部代理状态错误回调
+            register_should_stop_callback: Callable[[], Awaitable[bool]] | None = None,                    # 停止检查回调
+            # Agent settings - 代理设置
+            output_model_schema: type[AgentStructuredOutput] | None = None,     # 输出模型架构
+            use_vision: bool = True,                              # 是否使用视觉识别
+            save_conversation_path: str | Path | None = None,     # 对话保存路径
+            save_conversation_path_encoding: str | None = 'utf-8', # 对话保存编码
+            max_failures: int = 3,                                # 最大失败次数
+            override_system_message: str | None = None,           # 覆盖系统消息
+            extend_system_message: str | None = None,             # 扩展系统消息
+            generate_gif: bool | str = False,                     # 是否生成GIF动图
+            available_file_paths: list[str] | None = None,        # 可用文件路径列表
+            include_attributes: list[str] | None = None,          # 包含的HTML属性
+            max_actions_per_step: int = 10,                       # 每步最大操作数
+            use_thinking: bool = True,                            # 是否启用思考模式
+            flash_mode: bool = False,                             # 是否启用快速模式
+            max_history_items: int | None = None,                 # 最大历史记录数
+            page_extraction_llm: BaseChatModel | None = None,     # 页面提取专用LLM
+            injected_agent_state: AgentState | None = None,       # 注入的代理状态
+            source: str | None = None,                            # 代理来源标识
+            file_system_path: str | None = None,                  # 文件系统路径
+            task_id: str | None = None,                           # 任务ID
+            calculate_cost: bool = False,                         # 是否计算成本
+            display_files_in_done_text: bool = True,              # 在完成文本中显示文件
+            include_tool_call_examples: bool = False,            # 是否包含工具调用示例
+            vision_detail_level: Literal['auto', 'low', 'high'] = 'auto',  # 视觉详细程度
+            llm_timeout: int = 90,                                # LLM超时时间（秒）
+            step_timeout: int = 120,                              # 步骤超时时间（秒）
+            directly_open_url: bool = False,                      # 是否直接打开URL
+            include_recent_events: bool = False,                  # 是否包含最近事件
+            sample_images: list[ContentPartTextParam | ContentPartImageParam] | None = None,  # 示例图像
+            final_response_after_failure: bool = True,            # 失败后是否给出最终响应
+            allow_parallel_action_types: list[str] = ["extract", "extract_content_from_file"],  # 允许的并行操作类型
+            _url_shortening_limit: int = 25,                      # URL缩短限制
+            token_cost_service: Optional[TokenCost] = None,       # 令牌成本服务
             **kwargs,
     ):
+        # 设置默认值
         if page_extraction_llm is None:
             page_extraction_llm = llm
         if available_file_paths is None:
             available_file_paths = []
 
-        self.id = task_id or uuid7str()
-        self.task_id: str = self.id
-        self.session_id: str = uuid7str()
-        self.allow_parallel_action_types = allow_parallel_action_types
-        self._url_shortening_limit = _url_shortening_limit
-        self.sample_images = sample_images
-        browser_profile = browser_profile or DEFAULT_BROWSER_PROFILE
+        # 生成唯一标识符
+        self.id = task_id or uuid7str()              # 代理ID
+        self.task_id: str = self.id                  # 任务ID（与代理ID相同）
+        self.session_id: str = uuid7str()            # 会话ID
+        self.allow_parallel_action_types = allow_parallel_action_types  # 允许的并行操作类型
+        self._url_shortening_limit = _url_shortening_limit  # URL缩短限制
+        self.sample_images = sample_images            # 示例图像
+        browser_profile = browser_profile or DEFAULT_BROWSER_PROFILE  # 浏览器配置文件
 
-        # Handle browser vs browser_session parameter (browser takes precedence)
+        # 处理浏览器参数冲突（browser参数优先）
         if browser and browser_session:
             raise ValueError(
-                'Cannot specify both "browser" and "browser_session" parameters. Use "browser" for the cleaner API.')
+                '不能同时指定"browser"和"browser_session"参数。请使用"browser"参数以获得更简洁的API。')
         browser_session = browser or browser_session
 
+        # 初始化浏览器会话
         self.browser_session = browser_session or BrowserSession(
             browser_profile=browser_profile,
-            id=uuid7str()[:-4] + self.id[-4:],  # re-use the same 4-char suffix so they show up together in logs
+            id=uuid7str()[:-4] + self.id[-4:],  # 重用相同的4字符后缀，以便在日志中一起显示
         )
 
-        # Initialize available file paths as direct attribute
+        # 设置可用文件路径作为直接属性
         self.available_file_paths = available_file_paths
 
-        # Core components
-        self.task = task
-        self.llm = llm
-        self.directly_open_url = directly_open_url
-        self.include_recent_events = include_recent_events
+        # 核心组件初始化
+        self.task = task                              # 任务描述
+        self.llm = llm                                # 语言模型实例
+        self.directly_open_url = directly_open_url    # 是否直接打开URL
+        self.include_recent_events = include_recent_events  # 是否包含最近事件
+
+        # 设置工具系统
         if tools is not None:
             self.tools = tools
         elif controller is not None:

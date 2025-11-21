@@ -1,3 +1,18 @@
+// -*- coding: utf-8 -*-
+/**
+ * VibeSurf应用头部组件
+ *
+ * 这是应用的主导航栏组件，包含Logo、导航菜单、通知中心、
+ * 用户菜单等功能。支持多品牌切换、通知管理、主题切换等核心功能。
+ *
+ * 主要功能：
+ * - 品牌Logo展示（支持DataStax和Langflow）
+ * - 流程菜单导航
+ * - 通知中心管理
+ * - 用户账户菜单
+ * - 主题切换控制
+ */
+
 import { useEffect, useRef, useState } from "react";
 import AlertDropdown from "@/alerts/alertDropDown";
 import DataStaxLogo from "@/assets/DataStaxLogo.svg?react";
@@ -16,12 +31,29 @@ import useTheme from "@/customization/hooks/use-custom-theme";
 import useAlertStore from "@/stores/alertStore";
 import FlowMenu from "./components/FlowMenu";
 
+/**
+ * AppHeader应用头部组件
+ *
+ * 作为应用的顶部导航栏，提供：
+ * 1. 品牌标识和Logo展示
+ * 2. 主要功能菜单导航
+ * 3. 通知中心状态管理
+ * 4. 用户账户和设置菜单
+ * 5. 主题切换功能
+ */
 export default function AppHeader(): JSX.Element {
+  // 从状态管理中获取通知中心状态
   const notificationCenter = useAlertStore((state) => state.notificationCenter);
   const navigate = useCustomNavigate();
+
+  // 管理通知面板的显示状态
   const [activeState, setActiveState] = useState<"notifications" | null>(null);
+
+  // DOM引用，用于点击外部关闭通知面板
   const notificationRef = useRef<HTMLButtonElement | null>(null);
   const notificationContentRef = useRef<HTMLDivElement | null>(null);
+
+  // 初始化主题管理
   useTheme();
 
   useEffect(() => {

@@ -1,3 +1,16 @@
+# -*- coding: utf-8 -*-
+"""
+VibeSurf代理数据模型和配置视图
+
+这个模块定义了VibeSurf代理系统的核心数据模型、配置选项和输出格式。
+包含了代理设置、输出结构、以及工具集成的Pydantic模型定义。
+
+主要组件：
+- VibeSurfAgentOutput: 代理输出模型
+- VibeSurfAgentSettings: 代理配置设置
+- CustomAgentOutput: 自定义代理输出格式
+"""
+
 import asyncio
 import json
 import logging
@@ -11,6 +24,7 @@ from typing import Any, Dict, List, Optional, Union
 from uuid_extensions import uuid7str
 from json_repair import repair_json
 
+# Browser-Use框架相关导入
 from browser_use.browser.session import BrowserSession
 from browser_use.llm.base import BaseChatModel
 from browser_use.llm.messages import UserMessage, SystemMessage, BaseMessage, AssistantMessage, ContentPartTextParam, \
@@ -24,11 +38,20 @@ from browser_use.tools.registry.views import ActionModel
 
 
 class VibeSurfAgentOutput(BaseModel):
-    """Agent output model following browser_use patterns"""
+    """
+    VibeSurf代理输出模型
+
+    遵循browser-use模式的代理输出结构，包含思考过程和动作列表。
+    支持动态类型扩展和自定义动作模型。
+
+    属性：
+        thinking: 代理的思考过程，用于决策推理
+        action: 需要执行的动作列表
+    """
     model_config = ConfigDict(arbitrary_types_allowed=True, extra='forbid')
 
-    thinking: str | None = None
-    action: List[Any] = Field(
+    thinking: str | None = None     # 代理思考过程，可选字段
+    action: List[Any] = Field(     # 动作列表，至少包含一个动作
         ...,
         description='List of actions to execute',
         json_schema_extra={'min_items': 1},
@@ -57,27 +80,55 @@ class VibeSurfAgentOutput(BaseModel):
 
 
 class VibeSurfAgentSettings(BaseModel):
-    use_vision: bool = True
-    max_failures: int = 3
-    override_system_message: str | None = None
-    extend_system_message: str | None = None
-    include_attributes: list[str] | None = DEFAULT_INCLUDE_ATTRIBUTES
-    max_actions_per_step: int = 4
-    max_history_items: int | None = None
-    include_token_cost: bool = False
+    """
+    VibeSurf代理配置设置模型
 
-    calculate_cost: bool = True
-    include_tool_call_examples: bool = False
-    llm_timeout: int = 60  # Timeout in seconds for LLM calls
-    step_timeout: int = 180  # Timeout in seconds for each step
+    定义了代理运行时的各项配置参数，包括超时设置、
+    执行模式、性能优化选项等。
 
-    agent_mode: str = "thinking"  # thinking, no-thinking, flash
+    配置项：
+        use_vision: 是否启用视觉识别功能
+        max_failures: 最大失败重试次数
+        agent_mode: 代理执行模式（thinking/no-thinking/flash）
+        各种超时和性能设置
+    """
+    use_vision: bool = True                                   # 是否启用视觉识别
+    max_failures: int = 3                                    # 最大失败重试次数
+    override_system_message: str | None = None               # 完全替换系统消息
+    extend_system_message: str | None = None                 # 扩展系统消息
+    include_attributes: list[str] | None = DEFAULT_INCLUDE_ATTRIBUTES  # 包含的HTML属性
+    max_actions_per_step: int = 4                           # 每步最大动作数
+    max_history_items: int | None = None                     # 最大历史记录项数
+    include_token_cost: bool = False                        # 是否包含令牌成本
+
+    calculate_cost: bool = True                              # 是否计算成本
+    include_tool_call_examples: bool = False                 # 是否包含工具调用示例
+    llm_timeout: int = 60                                    # LLM调用超时时间（秒）
+    step_timeout: int = 180                                  # 每步执行超时时间（秒）
+
+    agent_mode: str = "thinking"                             # 代理模式：thinking/no-thinking/flash
 
 
 class CustomAgentOutput(BaseModel):
+    """
+    自定义代理输出模型
+
+    提供了更灵活的代理输出格式，支持动态动作类型扩展。
+    可根据不同的代理模式和工具集定制输出结构。
+
+    特性：
+        - 支持thinking模式的思考过程输出
+        - 支持无thinking模式的快速执行
+        - 动态类型扩展能力
+        - 与工具注册系统的无缝集成
+
+    属性：
+        thinking: 代理思考过程（可选）
+        action: 要执行的动作（ActionModel格式）
+    """
     model_config = ConfigDict(arbitrary_types_allowed=True, extra='forbid')
-    thinking: str | None = None
-    action: ActionModel = Field(
+    thinking: str | None = None              # 代理思考过程，支持no-thinking模式
+    action: ActionModel = Field(             # 使用ActionModel类型的动作定义
         ...,
         description='Action to execute',
     )

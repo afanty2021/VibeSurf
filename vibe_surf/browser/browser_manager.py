@@ -1,3 +1,18 @@
+# -*- coding: utf-8 -*-
+"""
+VibeSurf浏览器管理器
+
+这个模块负责管理多个代理的浏览器会话，提供代理隔离、
+会话分配、标签页管理等功能。支持CDP协议直接调用，
+提供高性能的浏览器自动化控制。
+
+核心特性：
+- 多代理浏览器会话隔离
+- CDP协议直接集成
+- 智能标签页分配和复用
+- 连接池管理和资源优化
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -6,11 +21,13 @@ import pdb
 import threading
 from typing import Dict, List, Optional, Set, TYPE_CHECKING
 
+# Browser-Use框架导入
 from browser_use.browser.session import CDPClient
 from browser_use.browser.views import TabInfo
 from cdp_use.cdp.target.types import TargetInfo
 from bubus import EventBus
 
+# VibeSurf内部导入
 from vibe_surf.browser.agent_browser_session import AgentBrowserSession
 
 if TYPE_CHECKING:
@@ -22,12 +39,29 @@ logger = get_logger(__name__)
 
 
 class BrowserManager:
-    """Manages isolated browser sessions for multiple agents with enhanced security."""
+    """
+    浏览器管理器
+
+    为多个代理提供隔离的浏览器会话管理。每个代理都有独立的会话池，
+    支持智能标签页分配和CDP协议直接调用，提供增强的安全性。
+
+    主要功能：
+        - 代理注册和会话分配
+        - 标签页管理和目标分配
+        - CDP客户端管理
+        - 连接池优化
+    """
 
     def __init__(self, main_browser_session: BrowserSession):
+        """
+        初始化浏览器管理器
+
+        Args:
+            main_browser_session: 主浏览器会话实例
+        """
         self.main_browser_session = main_browser_session
 
-        # Store a list of sessions for each agent
+        # 存储每个代理的会话列表
         self._agent_sessions: Dict[str, AgentBrowserSession] = {}
 
     @property

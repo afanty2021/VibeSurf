@@ -1,59 +1,89 @@
-// Main Entry Point - VibeSurf Chrome Extension
-// Initializes and coordinates all components of the extension
+/**
+ * VibeSurf Chrome扩展主入口脚本
+ *
+ * 这是Chrome扩展侧边栏应用的主入口文件，负责协调和初始化
+ * 扩展的所有组件。管理API客户端、会话管理器、UI管理器等核心模块，
+ * 提供完整的用户界面和后端通信功能。
+ *
+ * 主要功能：
+ * - 应用组件协调和初始化
+ * - API客户端管理
+ * - 用户设置管理
+ * - 错误处理和恢复
+ * - 健康检查和状态监控
+ */
 
-console.log('[VibeSurf] Main script starting...');
+console.log('[VibeSurf] 主脚本启动中...');
 
+/**
+ * VibeSurf应用类
+ *
+ * 作为Chrome扩展侧边栏的中央控制器，管理所有核心组件的
+ * 生命周期和协调工作。提供统一的初始化流程和错误处理机制。
+ */
 class VibeSurfApp {
   constructor() {
-    this.apiClient = null;
-    this.sessionManager = null;
-    this.uiManager = null;
-    this.settings = {};
-    this.isInitialized = false;
-    
-    console.log('[VibeSurf] Application starting...');
+    this.apiClient = null;               // API客户端实例
+    this.sessionManager = null;           // 会话管理器实例
+    this.uiManager = null;                // UI管理器实例
+    this.settings = {};                   // 用户设置
+    this.isInitialized = false;            // 初始化状态标志
+
+    console.log('[VibeSurf] 应用启动中...');
   }
 
+  /**
+   * 初始化应用
+   *
+   * 按照预定顺序初始化所有组件：
+   * 1. 加载用户设置
+   * 2. 初始化API客户端
+   * 3. 检查后端连接
+   * 4. 初始化会话管理器
+   * 5. 初始化UI管理器
+   * 6. 设置错误处理
+   * 7. 启动健康检查
+   */
   async initialize() {
     try {
-      console.log('[VibeSurf] Initializing application...');
-      
-      // Load settings from storage
+      console.log('[VibeSurf] 正在初始化应用...');
+
+      // 从Chrome存储加载用户设置
       await this.loadSettings();
-      
-      // Initialize API client
+
+      // 初始化API客户端
       this.initializeAPIClient();
-      
-      // Check backend connectivity
+
+      // 检查与后端服务的连接
       await this.checkBackendConnection();
-      
-      // Initialize session manager
+
+      // 初始化会话管理器
       this.initializeSessionManager();
-      
-      // Initialize UI manager
+
+      // 初始化UI管理器
       await this.initializeUIManager();
-      
-      // Setup global error handling
+
+      // 设置全局错误处理
       this.setupErrorHandling();
-      
-      // Setup periodic health checks
+
+      // 设置定期健康检查
       this.setupHealthChecks();
-      
+
       this.isInitialized = true;
-      
-      console.log('[VibeSurf] Application initialized successfully');
-      
-      // Show success notification
+
+      console.log('[VibeSurf] 应用初始化成功');
+
+      // 显示成功通知
       chrome.runtime.sendMessage({
         type: 'SHOW_NOTIFICATION',
         data: {
-          title: 'VibeSurf Ready',
-          message: 'Extension is ready to automate your browsing tasks!'
+          title: 'VibeSurf 已就绪',
+          message: '扩展已准备就绪，可以自动化您的浏览任务！'
         }
       });
-      
+
     } catch (error) {
-      console.error('[VibeSurf] Initialization failed:', error);
+      console.error('[VibeSurf] 初始化失败:', error);
       this.handleInitializationError(error);
     }
   }
