@@ -25,17 +25,19 @@ class BrowserPageInfoComponent(Component):
 
     outputs = [
         Output(
-            display_name="Browser Session",
-            name="output_browser_session",
+            display_name="Page Info",
+            name="page_info",
             method="get_page_information",
-            types=["AgentBrowserSession"]
-        )
+            types=["Data"],
+            group_outputs=True,
+        ),
     ]
 
     _page_info: Optional[Dict[str, Any]] = None
 
     async def get_page_information(self) -> Data:
         try:
+            await self.browser_session._wait_for_stable_network(max_attempt=3)
             page = await self.browser_session.get_current_page()
             url = await page.get_url()
             title = await page.get_title()
@@ -55,13 +57,9 @@ class BrowserPageInfoComponent(Component):
             self._page_info = page_info
             return Data(data=self._page_info)
         except Exception as e:
+            self._page_info = None
             import traceback
             traceback.print_exc()
             raise e
         finally:
-            return self.browser_session
-
-    async def pass_browser_session(self) -> AgentBrowserSession:
-        if not self._page_info:
-            await self.get_page_information()
-        return self.browser_session
+            return Data(data={})
