@@ -1,6 +1,6 @@
 # VibeSurf - AI 智能浏览器助手
 
-> 更新时间：2025-12-11 09:30:00
+> 更新时间：2025-12-15 11:00:00
 > 项目地址：https://github.com/vibesurf-ai/VibeSurf
 
 ## 项目简介
@@ -34,6 +34,16 @@ VibeSurf 是一个开源的 AI 驱动的智能浏览器助手，专注于浏览�
 - 支持自定义 LLM API
 - 确保浏览数据的隐私和安全
 
+### 🛠️ 工作流技能系统
+- 将工作流输入暴露为可复用的技能
+- 支持技能配置和管理
+- 工作流技能的动态加载和执行
+
+### 📁 文件系统操作
+- 完整的文件系统工作流支持（读取、写入、复制、移动等）
+- 文件内容搜索和替换
+- 目录创建和管理
+
 ## 技术架构
 
 ### 编程语言
@@ -64,7 +74,7 @@ VibeSurf 是一个开源的 AI 驱动的智能浏览器助手，专注于浏览�
 
 ### 第三方集成
 - **Composio**: 与数百个流行工具集成（Gmail、Notion、GitHub 等）
-- **原生 API**: 小红书、抖音、微博、YouTube 等平台
+- **原生 API**: 小红书、抖音、微博、YouTube、知乎等平台
 - **Firecrawl**: 网页数据提取
 - **AssemblyAI**: 语音识别和转录
 
@@ -85,9 +95,14 @@ vibesurf/
 │   │   │   ├── xhs/         # 小红书 API
 │   │   │   ├── douyin/      # 抖音 API
 │   │   │   ├── weibo/       # 微博 API
-│   │   │   └── youtube/     # YouTube API
+│   │   │   ├── youtube/     # YouTube API
+│   │   │   └── zhihu/       # 知乎 API
+│   │   ├── website_api_skills.py # 网站 API 技能封装
 │   │   └── ...              # 其他工具
 │   ├── workflows/            # 预定义工作流
+│   │   ├── FileSystem/      # 文件系统操作工作流
+│   │   ├── Integrations/    # 平台集成工作流
+│   │   └── VibeSurf/        # VibeSurf 核心工作流
 │   └── telemetry/            # 遥测和监控
 ├── tests/                    # 测试文件
 ├── docs/                     # 项目文档
@@ -211,6 +226,8 @@ vibesurf/
 - `GET /api/browser/status`: 获取浏览器状态
 - `POST /api/browser/navigate`: 导航到指定 URL
 - `POST /api/tools/execute`: 执行工具操作
+- `POST /api/skill/expose`: 配置工作流技能暴露
+- `GET /api/skill/{flow_id}`: 获取工作流技能配置
 
 ### WebSocket 事件
 - `agent:update`: 代理状态更新
@@ -335,6 +352,9 @@ DEBUG=false
 - [x] 智能技能系统（搜索、爬虫、代码执行）
 - [x] 第三方平台集成（Composio）
 - [x] 智能浏览器工作流
+- [x] 工作流技能系统（技能暴露和管理）
+- [x] 文件系统操作工作流
+- [x] 知乎平台集成
 
 ### 进行中 🚧
 - [ ] 强大的编程代理
