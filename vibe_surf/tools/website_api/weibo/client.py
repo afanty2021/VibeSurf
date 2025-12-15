@@ -12,6 +12,7 @@ from urllib.parse import parse_qs, unquote, urlencode
 
 from vibe_surf.browser.agent_browser_session import AgentBrowserSession
 from vibe_surf.logger import get_logger
+from vibe_surf.tools.website_api.base_client import BaseAPIClient
 
 from .helpers import (
     SearchType, TrendingType, TrendingConstants,
@@ -28,13 +29,14 @@ from .helpers import (
 logger = get_logger(__name__)
 
 
-class WeiboApiClient:
+class WeiboApiClient(BaseAPIClient):
     """
     Weibo API client with integrated browser session management.
     This client handles API communication through browser session for authentication.
     """
 
     def __init__(self, browser_session: AgentBrowserSession, timeout: int = 60, proxy: Optional[str] = None):
+        super().__init__(browser_session, timeout, proxy)
         """
         Initialize the Weibo API client
         
@@ -124,12 +126,18 @@ class WeiboApiClient:
 
     async def check_login(self) -> bool:
         """Check if login state is valid using multiple methods"""
+        ping_flag = False
         try:
-            ret = await self.search_posts_by_keyword("小红书")
-            return ret and len(ret) > 0
+            uri = "/api/config"
+            resp_data: Dict = await self._get_request(endpoint=uri)
+            if resp_data.get("login"):
+                ping_flag = True
+            else:
+                logger.error(f"[WeiboClient.pong] cookie may be invalid and again login...")
         except Exception as e:
-            logger.error(f"Failed to check Weibo login status: {e}")
-            return False
+            logger.error(f"[WeiboClient.pong] Pong weibo failed: {e}, and try to login again...")
+            ping_flag = False
+        return ping_flag
 
     @retry(stop=stop_after_attempt(3), wait=wait_fixed(1))
     async def _make_request(self, method: str, url: str, **kwargs):
@@ -214,7 +222,7 @@ class WeiboApiClient:
             self,
             keyword: str,
             page: int = 1,
-            search_type: SearchType = SearchType.DEFAULT,
+            search_type: str = "60",
     ) -> List[Dict]:
         """
         Search Weibo posts by keyword

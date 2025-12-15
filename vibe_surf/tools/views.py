@@ -125,10 +125,10 @@ class SkillSearchAction(BaseModel):
     query: str = Field(
         description='Search query to generate multiple search tasks and find relevant information',
     )
-    rank: bool = Field(
-        default=False,
-        description='Whether to use LLM ranking for results.',
-    )
+    # rank: bool = Field(
+    #     default=False,
+    #     description='Whether to use LLM ranking for results.',
+    # )
 
 
 class SkillCrawlAction(BaseModel):
@@ -264,6 +264,25 @@ class SkillWeiboAction(BaseModel):
     )
 
 
+class SkillZhihuAction(BaseModel):
+    """Parameters for skill_zhihu action - Zhihu API skill"""
+    method: str = Field(
+        description='''Zhihu API method name. Available methods:
+        - get_note_by_keyword: Search content by keyword, params required: {"keyword": "search keyword", "page": 1, "page_size": 20, "sort": "default", "note_type": "default", "search_time": "default"}
+        - get_all_comments: Get all comments (root and child) for content, params required: {"content_id": "content ID", "max_comments": "max comments num, default 100", "content_type": "answer|article|zvideo", "crawl_interval": 1.0}
+        - get_creator_info: Get creator profile, params required: {"url_token": "creator url token"}
+        - get_all_answer_by_creator: Get all answers by creator, params required: {"url_token": "creator url token", "crawl_interval": 1.0}
+        - get_all_articles_by_creator: Get all articles by creator, params required: {"url_token": "creator url token", "crawl_interval": 1.0}
+        - get_all_videos_by_creator: Get all videos by creator, params required: {"url_token": "creator url token", "crawl_interval": 1.0}
+        - get_answer_info: Get answer details, params required: {"question_id": "question ID", "answer_id": "answer ID"}
+        - get_article_info: Get article details, params required: {"article_id": "article ID"}
+        - get_video_info: Get video details, params required: {"video_id": "video ID"}'''
+    )
+    params: str = Field(
+        description='JSON string of method parameters, provide corresponding parameters according to the method parameter. Example: {"keyword": "Python编程"}'
+    )
+
+
 class SkillDouyinAction(BaseModel):
     """Parameters for skill_douyin action - Douyin API skill"""
     method: str = Field(
@@ -362,4 +381,51 @@ class SkillTrendAction(BaseModel):
         description='Maximum number of news items to return per source',
         ge=1,
         le=50,
+    )
+
+
+class GetApiParamsAction(BaseModel):
+    """Parameters for get_api_params action - Get API parameters for website platforms"""
+    platform: str = Field(
+        description='Platform name: "xiaohongshu", "weibo", "zhihu", "douyin", or "youtube"'
+    )
+
+
+class CallApiAction(BaseModel):
+    """Parameters for call_api action - Call website platform API"""
+    platform: str = Field(
+        description='Platform name: "xiaohongshu", "weibo", "zhihu", "douyin", or "youtube"'
+    )
+    method: str = Field(
+        description='API method name to call'
+    )
+    params: str = Field(
+        description='JSON string of method parameters'
+    )
+
+
+class SearchWorkflowsAction(BaseModel):
+    """Parameters for search_workflows action - Search available workflows"""
+    key_words: str | None = Field(
+        default=None,
+        description='Comma-separated keywords to search in workflow name and description. Use empty string, None, or "*" to return all workflows. Example: "search,data,analysis"'
+    )
+    workflow_id: str | None = Field(
+        default=None,
+        min_length=4,
+        max_length=4,
+        description='Optional last 4 digits of workflow ID for direct lookup.'
+    )
+
+
+class ExecuteWorkflowAction(BaseModel):
+    """Parameters for execute_workflow action - Execute a workflow with tweaks"""
+    workflow_id: str = Field(
+        min_length=4,
+        max_length=4,
+        description='Last 4 digits of the workflow ID to execute'
+    )
+    tweak_params: str | None = Field(
+        default=None,
+        description='JSON string containing tweak parameters in format: {"component_id": {"input_name": "input_value"}}. Example: {"TextInput-uU4Rl": {"input_value": "vibesurf"}}. Only include parameters that need to be adjusted; others will use default values.'
     )

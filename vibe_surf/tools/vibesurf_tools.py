@@ -48,8 +48,8 @@ from vibe_surf.browser.agent_browser_session import AgentBrowserSession
 from vibe_surf.tools.views import HoverAction, ExtractionAction, FileExtractionAction, BrowserUseAgentExecution, \
     ReportWriterTask, TodoGenerateAction, TodoModifyAction, VibeSurfDoneAction, SkillSearchAction, SkillCrawlAction, \
     SkillSummaryAction, SkillTakeScreenshotAction, SkillDeepResearchAction, SkillCodeAction, SkillFinanceAction, \
-    SkillXhsAction, SkillDouyinAction, SkillYoutubeAction, SkillWeiboAction, GrepContentAction, \
-    SearchToolAction, GetToolInfoAction, ExecuteExtraToolAction, ExecutePythonCodeAction, SkillTrendAction
+    GrepContentAction, SearchToolAction, GetToolInfoAction, ExecuteExtraToolAction, ExecutePythonCodeAction, \
+    SkillTrendAction, GetApiParamsAction, CallApiAction, SearchWorkflowsAction, ExecuteWorkflowAction
 from vibe_surf.tools.finance_tools import FinanceDataRetriever, FinanceMarkdownFormatter, FinanceMethod
 from vibe_surf.tools.mcp_client import CustomMCPClient
 from vibe_surf.tools.composio_client import ComposioClient
@@ -79,7 +79,9 @@ class VibeSurfTools:
         self._register_todo_actions()
         self._register_done_action()
         self._register_skills()
+        self._register_api_skills()
         self._register_extra_tools()
+        self._register_workflow_skills()
         self.mcp_server_config = mcp_server_config
         self.mcp_clients: Dict[str, MCPClient] = {}
         self.composio_toolkits: Dict[str, Any] = {}
@@ -133,7 +135,8 @@ class VibeSurfTools:
                 search_result_dict = await google_ai_model_search(browser_manager, params.query, max_results=15)
 
                 # Step 2: If AI search fails or returns insufficient results, use fallback method
-                if not search_result_dict or (isinstance(search_result_dict, dict) and len(search_result_dict.get('sources', [])) == 0):
+                if not search_result_dict or (
+                        isinstance(search_result_dict, dict) and len(search_result_dict.get('sources', [])) == 0):
                     logger.info(f'🔄 Google AI search returned no results, using fallback parallel search')
 
                     # Use parallel search across all, news, and videos tabs
@@ -147,50 +150,28 @@ class VibeSurfTools:
                 ai_response = search_result_dict.get('response', '')
                 all_results = search_result_dict.get('sources', [])
 
-                # Step 3: Process results based on rank parameter
-                if params.rank and all_results and len(all_results) > 10:
-                    logger.info(f'🔄 Using LLM ranking for {len(all_results)} results')
+                if used_fallback:
+                    tab_groups = {'all': [], 'news': [], 'videos': [], 'other': []}
 
-                    if not page_extraction_llm:
-                        logger.warning("LLM not available for ranking, returning unranked results")
-                        top_results = all_results[:15]
-                    else:
-                        # Use LLM ranking when rank=True and we have many results
-                        top_results = await _rank_search_results_with_llm(
-                            all_results, params.query, page_extraction_llm
-                        )
-                elif params.rank and all_results and len(all_results) <= 10:
-                    logger.info(f'⭐ Skipping LLM ranking for {len(all_results)} results (≤10)')
-                    top_results = all_results
+                    for result in all_results:
+                        source_tab = result.get('source_tab', 'other')
+                        tab_groups[source_tab].append(result)
+
+                    # Take up to 5 results from each tab
+                    top_results = []
+                    for tab_name in ['all', 'news', 'videos', 'other']:
+                        top_results.extend(tab_groups[tab_name][:5])
                 else:
-                    # When rank=False, return results from different tabs (5 each from all, news, videos)
-                    if hasattr(all_results, '__iter__') and all_results:
-                        # Group results by source_tab if available, otherwise take first 15
-                        tab_groups = {'all': [], 'news': [], 'videos': [], 'other': []}
-
-                        for result in all_results:
-                            source_tab = result.get('source_tab', 'other')
-                            tab_groups[source_tab].append(result)
-
-                        # Take up to 5 results from each tab
-                        top_results = []
-                        for tab_name in ['all', 'news', 'videos', 'other']:
-                            top_results.extend(tab_groups[tab_name][:5])
-
-                        # If we don't have enough results from tabs, take the first 15 overall
-                        if len(top_results) < 15:
-                            top_results = all_results[:15]
-                    else:
-                        top_results = all_results[:15] if all_results else []
+                    top_results = all_results[:15]
 
                 # Step 4: Format results for display - AI response first, then sources
                 results_text = f"# 🔍 Search Results for '{params.query}'\n\n"
-                
+
                 # Display AI response if available
                 if ai_response:
                     results_text += f"## 🤖 AI Response\n\n{ai_response}\n\n"
                     results_text += "---\n\n"
-                
+
                 # Display sources
                 if top_results:
                     results_text += f"## 📚 Sources ({len(top_results)} results)\n\n"
@@ -205,7 +186,8 @@ class VibeSurfTools:
                 else:
                     results_text += f"## 📚 Sources\n\nNo source results found for query: {params.query}\n\n"
 
-                logger.info(f'🔍 Skill Search completed for: {params.query}, found {len(top_results)} sources, AI response: {bool(ai_response)}')
+                logger.info(
+                    f'🔍 Skill Search completed for: {params.query}, found {len(top_results)} sources, AI response: {bool(ai_response)}')
                 return ActionResult(
                     extracted_content=results_text,
                     include_extracted_content_only_once=True,
@@ -544,426 +526,6 @@ class VibeSurfTools:
                 return ActionResult(error=error_msg, extracted_content=error_msg)
 
         @self.registry.action(
-            '',
-            param_model=SkillXhsAction,
-        )
-        async def skill_xhs(
-                params: SkillXhsAction,
-                browser_manager: BrowserManager,
-                file_system: CustomFileSystem
-        ):
-            """
-            Skill: Xiaohongshu API integration
-            
-            Available methods:
-            - search_content_by_keyword: Search content by keyword with sorting options
-            - fetch_content_details: Get detailed information about specific content
-            - fetch_all_content_comments: Get all comments for specific content
-            - get_user_profile: Get user profile information
-            - fetch_all_user_content: Get all content posted by a user
-            - get_home_recommendations: Get homepage recommended content
-            """
-            try:
-                from vibe_surf.tools.website_api.xhs.client import XiaoHongShuApiClient
-
-                # Initialize client
-                xhs_client = XiaoHongShuApiClient(browser_session=browser_manager.main_browser_session)
-                await xhs_client.setup()
-
-                # Parse params JSON string
-                import json
-                from json_repair import repair_json
-                try:
-                    method_params = json.loads(params.params)
-                except json.JSONDecodeError:
-                    method_params = json.loads(repair_json(params.params))
-
-                # Execute the requested method
-                result = None
-                if params.method == "search_content_by_keyword":
-                    result = await xhs_client.search_content_by_keyword(**method_params)
-                elif params.method == "fetch_content_details":
-                    result = await xhs_client.fetch_content_details(**method_params)
-                elif params.method == "fetch_all_content_comments":
-                    result = await xhs_client.fetch_all_content_comments(**method_params)
-                elif params.method == "get_user_profile":
-                    result = await xhs_client.get_user_profile(**method_params)
-                elif params.method == "fetch_all_user_content":
-                    result = await xhs_client.fetch_all_user_content(**method_params)
-                elif params.method == "get_home_recommendations":
-                    result = await xhs_client.get_home_recommendations()
-                else:
-                    return ActionResult(error=f"Unknown method: {params.method}")
-
-                # Save result to file
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"xhs_{params.method}_{timestamp}.json"
-                filepath = file_system.get_dir() / "data" / filename
-                filepath.parent.mkdir(exist_ok=True)
-
-                with open(filepath, "w", encoding="utf-8") as f:
-                    json.dump(result, f, ensure_ascii=False, indent=2)
-
-                # Format result as markdown
-                if isinstance(result, list):
-                    display_count = min(5, len(result))
-                    md_content = f"## Xiaohongshu {params.method.replace('_', ' ').title()}\n\n"
-                    md_content += f"Showing {display_count} of {len(result)} results:\n\n"
-                    for i, item in enumerate(result[:display_count]):
-                        md_content += f"### Result {i + 1}\n"
-                        for key, value in item.items():
-                            if not value:
-                                continue
-                            if isinstance(value, str) and len(value) > 200:
-                                md_content += f"- **{key}**: {value[:200]}...\n"
-                            else:
-                                md_content += f"- **{key}**: {value}\n"
-                        md_content += "\n"
-                else:
-                    md_content = f"## Xiaohongshu {params.method.replace('_', ' ').title()}\n\n"
-                    for key, value in result.items():
-                        if isinstance(value, str) and len(value) > 200:
-                            md_content += f"- **{key}**: {value[:200]}...\n"
-                        else:
-                            md_content += f"- **{key}**: {value}\n"
-                    md_content += "\n"
-
-                # Add file path to markdown
-                relative_path = str(filepath.relative_to(file_system.get_dir()))
-                md_content += f"\n> 📁 Full data saved to: [{filename}]({relative_path})\n"
-                md_content += f"> 💡 Click the link above to view all results.\n"
-
-                logger.info(f'📕 Xiaohongshu data retrieved with method: {params.method}')
-
-                # Close client
-                await xhs_client.close()
-
-                return ActionResult(
-                    extracted_content=md_content
-                )
-
-            except Exception as e:
-                error_msg = f'❌ Failed to retrieve Xiaohongshu data: {str(e)}'
-                logger.error(error_msg)
-                return ActionResult(error=error_msg, extracted_content=error_msg)
-
-        @self.registry.action(
-            '',
-            param_model=SkillWeiboAction,
-        )
-        async def skill_weibo(
-                params: SkillWeiboAction,
-                browser_manager: BrowserManager,
-                file_system: CustomFileSystem
-        ):
-            """
-            Skill: Weibo API integration
-            
-            Available methods:
-            - search_posts_by_keyword: Search posts by keyword with sorting options
-            - get_post_detail: Get detailed information about specific post
-            - get_all_post_comments: Get all comments for specific post
-            - get_user_info: Get user profile information
-            - get_all_user_posts: Get all posts by a user
-            - get_hot_posts: Get hot posts
-            - get_trending_list: Get trending list
-            """
-            try:
-                from vibe_surf.tools.website_api.weibo.client import WeiboApiClient
-
-                # Initialize client
-                wb_client = WeiboApiClient(browser_session=browser_manager.main_browser_session)
-                await wb_client.setup()
-
-                # Parse params JSON string
-                import json
-                from json_repair import repair_json
-                try:
-                    method_params = json.loads(params.params)
-                except json.JSONDecodeError:
-                    method_params = json.loads(repair_json(params.params))
-
-                # Execute the requested method
-                result = None
-                if params.method == "search_posts_by_keyword":
-                    result = await wb_client.search_posts_by_keyword(**method_params)
-                elif params.method == "get_post_detail":
-                    result = await wb_client.get_post_detail(**method_params)
-                elif params.method == "get_all_post_comments":
-                    result = await wb_client.get_all_post_comments(**method_params)
-                elif params.method == "get_user_info":
-                    result = await wb_client.get_user_info(**method_params)
-                elif params.method == "get_all_user_posts":
-                    result = await wb_client.get_all_user_posts(**method_params)
-                elif params.method == "get_hot_posts":
-                    result = await wb_client.get_hot_posts()
-                elif params.method == "get_trending_posts":
-                    result = await wb_client.get_trending_posts()
-                else:
-                    return ActionResult(error=f"Unknown method: {params.method}")
-
-                # Save result to file
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"weibo_{params.method}_{timestamp}.json"
-                filepath = file_system.get_dir() / "data" / filename
-                filepath.parent.mkdir(exist_ok=True)
-
-                with open(filepath, "w", encoding="utf-8") as f:
-                    json.dump(result, f, ensure_ascii=False, indent=2)
-                # Format result as markdown
-                if isinstance(result, list):
-                    display_count = min(5, len(result))
-                    md_content = f"## Weibo {params.method.replace('_', ' ').title()}\n\n"
-                    md_content += f"Showing {display_count} of {len(result)} results:\n\n"
-                    for i, item in enumerate(result[:display_count]):
-                        md_content += f"### Result {i + 1}\n"
-                        for key, value in item.items():
-                            if not value:
-                                continue
-                            if isinstance(value, str) and len(value) > 200:
-                                md_content += f"- **{key}**: {value[:200]}...\n"
-                            else:
-                                md_content += f"- **{key}**: {value}\n"
-                        md_content += "\n"
-                else:
-                    md_content = f"## Weibo {params.method.replace('_', ' ').title()}\n\n"
-                    for key, value in result.items():
-                        if isinstance(value, str) and len(value) > 200:
-                            md_content += f"- **{key}**: {value[:200]}...\n"
-                        else:
-                            md_content += f"- **{key}**: {value}\n"
-                    md_content += "\n"
-
-                # Add file path to markdown
-                relative_path = str(filepath.relative_to(file_system.get_dir()))
-                md_content += f"\n> 📁 Full data saved to: [{filename}]({relative_path})\n"
-                md_content += f"> 💡 Click the link above to view all results.\n"
-
-                logger.info(f'🐦 Weibo data retrieved with method: {params.method}')
-
-                # Close client
-                await wb_client.close()
-
-                return ActionResult(
-                    extracted_content=md_content
-                )
-
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                error_msg = f'❌ Failed to retrieve Weibo data: {str(e)}. \nMost likely you are not login, please go to: [Weibo login page](https://passport.weibo.com/sso/signin?entry=miniblog&source=miniblog) and login.'
-                logger.error(error_msg)
-                return ActionResult(error=error_msg, extracted_content=error_msg)
-
-        @self.registry.action(
-            '',
-            param_model=SkillDouyinAction,
-        )
-        async def skill_douyin(
-                params: SkillDouyinAction,
-                browser_manager: BrowserManager,
-                file_system: CustomFileSystem
-        ):
-            """
-            Skill: Douyin API integration
-            
-            Available methods:
-            - search_content_by_keyword: Search content by keyword with filtering options
-            - fetch_video_details: Get detailed information about specific video
-            - fetch_all_video_comments: Get all comments for specific video
-            - fetch_user_info: Get user profile information
-            - fetch_all_user_videos: Get all videos by a user
-            """
-            try:
-                from vibe_surf.tools.website_api.douyin.client import DouyinApiClient
-
-                # Initialize client
-                dy_client = DouyinApiClient(browser_session=browser_manager.main_browser_session)
-                await dy_client.setup()
-
-                # Parse params JSON string
-                import json
-                from json_repair import repair_json
-                try:
-                    method_params = json.loads(params.params)
-                except json.JSONDecodeError:
-                    method_params = json.loads(repair_json(params.params))
-
-                # Execute the requested method
-                result = None
-                if params.method == "search_content_by_keyword":
-                    result = await dy_client.search_content_by_keyword(**method_params)
-                elif params.method == "fetch_video_details":
-                    result = await dy_client.fetch_video_details(**method_params)
-                elif params.method == "fetch_all_video_comments":
-                    result = await dy_client.fetch_all_video_comments(**method_params)
-                elif params.method == "fetch_user_info":
-                    result = await dy_client.fetch_user_info(**method_params)
-                elif params.method == "fetch_all_user_videos":
-                    result = await dy_client.fetch_all_user_videos(**method_params)
-                else:
-                    return ActionResult(error=f"Unknown method: {params.method}")
-
-                # Save result to file
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"douyin_{params.method}_{timestamp}.json"
-                filepath = file_system.get_dir() / "data" / filename
-                filepath.parent.mkdir(exist_ok=True)
-
-                with open(filepath, "w", encoding="utf-8") as f:
-                    json.dump(result, f, ensure_ascii=False, indent=2)
-
-                # Format result as markdown
-                if isinstance(result, list):
-                    display_count = min(5, len(result))
-                    md_content = f"## Douyin {params.method.replace('_', ' ').title()}\n\n"
-                    md_content += f"Showing {display_count} of {len(result)} results:\n\n"
-                    for i, item in enumerate(result[:display_count]):
-                        md_content += f"### Result {i + 1}\n"
-                        for key, value in item.items():
-                            if not value:
-                                continue
-                            if isinstance(value, str) and len(value) > 200:
-                                md_content += f"- **{key}**: {value[:200]}...\n"
-                            else:
-                                md_content += f"- **{key}**: {value}\n"
-                        md_content += "\n"
-                else:
-                    md_content = f"## Douyin {params.method.replace('_', ' ').title()}\n\n"
-                    for key, value in result.items():
-                        if isinstance(value, str) and len(value) > 200:
-                            md_content += f"- **{key}**: {value[:200]}...\n"
-                        else:
-                            md_content += f"- **{key}**: {value}\n"
-                    md_content += "\n"
-
-                # Add file path to markdown
-                relative_path = str(filepath.relative_to(file_system.get_dir()))
-                md_content += f"\n> 📁 Full data saved to: [{filename}]({relative_path})\n"
-                md_content += f"> 💡 Click the link above to view all results.\n"
-
-                logger.info(f'🎵 Douyin data retrieved with method: {params.method}')
-
-                # Close client
-                await dy_client.close()
-
-                return ActionResult(
-                    extracted_content=md_content
-                )
-
-            except Exception as e:
-                error_msg = f'❌ Failed to retrieve Douyin data: {str(e)}'
-                logger.error(error_msg)
-                return ActionResult(error=error_msg, extracted_content=error_msg)
-
-        @self.registry.action(
-            """YouTube API - If users want to know the specific content of this video, please use get_video_transcript to get detailed video content first.""",
-            param_model=SkillYoutubeAction,
-        )
-        async def skill_youtube(
-                params: SkillYoutubeAction,
-                browser_manager: BrowserManager,
-                file_system: CustomFileSystem
-        ):
-            """
-            Skill: YouTube API integration
-            
-            Available methods:
-            - search_videos: Search videos by keyword
-            - get_video_details: Get detailed information about specific video
-            - get_video_comments: Get comments for specific video
-            - get_channel_info: Get channel information
-            - get_channel_videos: Get videos from specific channel
-            - get_trending_videos: Get trending videos
-            - get_video_transcript: Get video transcript in multiple languages
-            """
-            try:
-                from vibe_surf.tools.website_api.youtube.client import YouTubeApiClient
-
-                # Initialize client
-                yt_client = YouTubeApiClient(browser_session=browser_manager.main_browser_session)
-                await yt_client.setup()
-
-                # Parse params JSON string
-                import json
-                from json_repair import repair_json
-                try:
-                    method_params = json.loads(params.params)
-                except json.JSONDecodeError:
-                    method_params = json.loads(repair_json(params.params))
-
-                # Execute the requested method
-                result = None
-                if params.method == "search_videos":
-                    result = await yt_client.search_videos(**method_params)
-                elif params.method == "get_video_details":
-                    result = await yt_client.get_video_details(**method_params)
-                elif params.method == "get_video_comments":
-                    result = await yt_client.get_video_comments(**method_params)
-                elif params.method == "get_channel_info":
-                    result = await yt_client.get_channel_info(**method_params)
-                elif params.method == "get_channel_videos":
-                    result = await yt_client.get_channel_videos(**method_params)
-                elif params.method == "get_trending_videos":
-                    result = await yt_client.get_trending_videos()
-                elif params.method == "get_video_transcript":
-                    result = await yt_client.get_video_transcript(**method_params)
-                else:
-                    return ActionResult(error=f"Unknown method: {params.method}")
-
-                # Save result to file
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                filename = f"youtube_{params.method}_{timestamp}.json"
-                filepath = file_system.get_dir() / "data" / filename
-                filepath.parent.mkdir(exist_ok=True)
-
-                with open(filepath, "w", encoding="utf-8") as f:
-                    json.dump(result, f, ensure_ascii=False, indent=2)
-
-                # Format result as markdown
-                if isinstance(result, list):
-                    display_count = min(5, len(result))
-                    md_content = f"## YouTube {params.method.replace('_', ' ').title()}\n\n"
-                    md_content += f"Showing {display_count} of {len(result)} results:\n\n"
-                    for i, item in enumerate(result[:display_count]):
-                        md_content += f"### Result {i + 1}\n"
-                        for key, value in item.items():
-                            if not value:
-                                continue
-                            if isinstance(value, str) and len(value) > 200:
-                                md_content += f"- **{key}**: {value[:200]}...\n"
-                            else:
-                                md_content += f"- **{key}**: {value}\n"
-                        md_content += "\n"
-                else:
-                    md_content = f"## YouTube {params.method.replace('_', ' ').title()}\n\n"
-                    for key, value in result.items():
-                        if isinstance(value, str) and len(value) > 200:
-                            md_content += f"- **{key}**: {value[:200]}...\n"
-                        else:
-                            md_content += f"- **{key}**: {value}\n"
-                    md_content += "\n"
-
-                # Add file path to markdown
-                relative_path = str(filepath.relative_to(file_system.get_dir()))
-                md_content += f"\n> 📁 Full data saved to: [{filename}]({relative_path})\n"
-                md_content += f"> 💡 Click the link above to view all results.\n"
-
-                logger.info(f'🎬 YouTube data retrieved with method: {params.method}')
-
-                # Close client
-                await yt_client.close()
-
-                return ActionResult(
-                    extracted_content=md_content
-                )
-
-            except Exception as e:
-                error_msg = f'❌ Failed to retrieve YouTube data: {str(e)}'
-                logger.error(error_msg)
-                return ActionResult(error=error_msg, extracted_content=error_msg)
-
-        @self.registry.action(
             """Execute Python code for data processing, visualization, and analysis.
             """,
             param_model=ExecutePythonCodeAction,
@@ -975,7 +537,7 @@ class VibeSurfTools:
             try:
                 # Get base directory from file system
                 base_dir = str(file_system.get_dir())
-                
+
                 # Create a secure namespace with pre-imported libraries
                 namespace = {
                     '__builtins__': {
@@ -996,7 +558,7 @@ class VibeSurfTools:
                     },
                     'SAVE_DIR': base_dir,
                 }
-                
+
                 # Import common libraries safely
                 try:
 
@@ -1020,12 +582,13 @@ class VibeSurfTools:
                         'csv': csv,
                         'io': io
                     })
-                    
+
                     # Add secure file helper functions
                     def safe_open(path, mode='r', **kwargs):
                         """Secure file open that restricts operations to BASE_DIR"""
                         if (not path.startswith(base_dir)) and os.path.isabs(path):
-                            raise PermissionError("Absolute paths are not allowed. Only relative paths within workspace are supported.")
+                            raise PermissionError(
+                                "Absolute paths are not allowed. Only relative paths within workspace are supported.")
                         if not path.startswith(base_dir):
                             full_path = os.path.join(base_dir, path)
                         else:
@@ -1034,7 +597,7 @@ class VibeSurfTools:
                             raise PermissionError("File operations are restricted to workspace directory only.")
                         os.makedirs(os.path.dirname(full_path), exist_ok=True)
                         return open(full_path, mode, **kwargs)
-                    
+
                     def safe_path(path):
                         """Get safe path within BASE_DIR"""
                         if (not path.startswith(base_dir)) and os.path.isabs(path):
@@ -1047,19 +610,19 @@ class VibeSurfTools:
                         if not full_path.startswith(base_dir):
                             raise PermissionError("File operations are restricted to workspace directory only.")
                         return full_path
-                    
+
                     namespace.update({
                         'open': safe_open,
                         'safe_path': safe_path,
                     })
-                    
+
                 except ImportError as e:
                     logger.warning(f"Failed to import some libraries: {e}")
-                
+
                 # Remove import statements from user code since modules are pre-imported
                 cleaned_code = remove_import_statements(params.code)
                 logger.info(cleaned_code)
-                
+
                 # Check for dangerous operations
                 dangerous_keywords = [
                     'import subprocess', 'import sys', 'import importlib',
@@ -1068,7 +631,7 @@ class VibeSurfTools:
                     'execfile', 'reload', 'vars(', 'globals(', 'locals(',
                     'delattr', 'setattr', 'getattr', '__'
                 ]
-                
+
                 code_lower = cleaned_code.lower()
                 for keyword in dangerous_keywords:
                     if keyword in code_lower and keyword not in ['open(', '__']:  # Allow our safe open
@@ -1077,19 +640,19 @@ class VibeSurfTools:
                         return ActionResult(
                             error=f"🚫 Security Error: Dangerous operation '{keyword}' detected. Code execution blocked for security reasons."
                         )
-                
+
                 # Capture stdout to get print outputs
                 import sys
                 from io import StringIO
-                
+
                 old_stdout = sys.stdout
                 sys.stdout = captured_output = StringIO()
-                
+
                 try:
                     # Compile and execute the cleaned code
                     compiled_code = compile(cleaned_code, '<code>', 'exec')
                     exec(compiled_code, namespace, namespace)
-                    
+
                     # Get the captured output
                     output_value = captured_output.getvalue()
                     if output_value.strip():
@@ -1099,11 +662,11 @@ class VibeSurfTools:
                 finally:
                     # Restore stdout
                     sys.stdout = old_stdout
-                
+
                 logger.info(f'🐍 Python code executed successfully')
                 return ActionResult(
                     extracted_content=result_text)
-                
+
             except PermissionError as e:
                 error_msg = f'🚫 Security Error: {str(e)}'
                 logger.error(error_msg)
@@ -1133,80 +696,80 @@ class VibeSurfTools:
             """
             try:
                 from vibe_surf.tools.website_api.newsnow.client import NewsNowClient
-                
+
                 # Initialize NewsNow client
                 client = NewsNowClient()
-                
+
                 # If source_id is None, show available sources
                 # If source_id is "*", fetch from all sources
                 if params.source_id is None:
                     available_sources = client.get_available_sources()
-                    
+
                     # Format available sources as markdown
                     md_content = "## 📰 Available News Sources\n\n"
                     md_content += f"Total: {len(available_sources)} sources\n\n"
-                    
+
                     # Group by type
                     realtime_sources = []
                     hottest_sources = []
                     all_sources = []
-                    
+
                     for source_id, metadata in available_sources.items():
                         source_type = metadata.get('type', 'all')
                         source_name = metadata.get('name', source_id)
                         source_title = metadata.get('title', '')
-                        
+
                         display_name = f"{source_name} - {source_title}" if source_title else source_name
-                        
+
                         if source_type == 'realtime':
                             realtime_sources.append((source_id, display_name))
                         elif source_type == 'hottest':
                             hottest_sources.append((source_id, display_name))
                         else:
                             all_sources.append((source_id, display_name))
-                    
+
                     if realtime_sources:
                         md_content += "### 🔴 Real-time News Sources\n"
                         for sid, name in realtime_sources:
                             md_content += f"- `{sid}`: {name}\n"
                         md_content += "\n"
-                    
+
                     if hottest_sources:
                         md_content += "### 🔥 Hottest News Sources\n"
                         for sid, name in hottest_sources:
                             md_content += f"- `{sid}`: {name}\n"
                         md_content += "\n"
-                    
+
                     if all_sources:
                         md_content += "### 📌 General News Sources\n"
                         for sid, name in all_sources:
                             md_content += f"- `{sid}`: {name}\n"
                         md_content += "\n"
-                    
+
                     md_content += "\n> 💡 Use any source_id above to fetch news from that specific source.\n"
-                    
+
                     logger.info(f'📰 Listed {len(available_sources)} available news sources')
                     return ActionResult(
                         extracted_content=md_content,
                         include_extracted_content_only_once=True,
                         long_term_memory=f'Listed {len(available_sources)} available news sources'
                     )
-                
+
                 # Fetch news from specified source or all sources
                 # If source_id is "*", set it to None to fetch all sources
                 fetch_source_id = None if params.source_id == "*" else params.source_id
-                
+
                 news_results = await client.get_news(
                     source_id=fetch_source_id,
                     count=params.count,
                     news_type=None  # Get both realtime and hottest
                 )
-                
+
                 # Filter by keywords if provided
                 if params.key_words:
                     keywords = [kw.strip().lower() for kw in params.key_words.split(',')]
                     filtered_results = {}
-                    
+
                     for source_id, news_items in news_results.items():
                         filtered_items = []
                         for item in news_items:
@@ -1221,12 +784,12 @@ class VibeSurfTools:
                             item_str = json.dumps(item_copy, ensure_ascii=False).lower()
                             if any(keyword in item_str for keyword in keywords):
                                 filtered_items.append(item)
-                        
+
                         if filtered_items:
                             filtered_results[source_id] = filtered_items
-                    
+
                     news_results = filtered_results
-                
+
                 # Format results as markdown
                 if not news_results:
                     md_content = f"## 📰 No news found\n\n"
@@ -1241,53 +804,344 @@ class VibeSurfTools:
                     if params.key_words:
                         md_content += f"Filtered by keywords: {params.key_words}\n"
                     md_content += "\n---\n\n"
-                    
+
                     # Get source metadata for display names
                     all_sources = client.get_available_sources()
-                    
+
                     for source_id, news_items in news_results.items():
                         source_info = all_sources.get(source_id, {})
                         source_name = source_info.get('name', source_id)
                         source_title = source_info.get('title', '')
-                        
+
                         display_name = f"{source_name} - {source_title}" if source_title else source_name
-                        
+
                         md_content += f"### 📌 {display_name} (`{source_id}`)\n\n"
                         md_content += f"{len(news_items)} items\n\n"
-                        
+
                         for i, item in enumerate(news_items[:params.count], 1):
                             title = item.get('title', 'No title')
                             url = item.get('url', '#')
-                            
+
                             md_content += f"{i}. [{title}]({url})\n"
-                        
+
                         md_content += "\n"
-                
+
                 # Save to file if results are large
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"newsnow_trend_{timestamp}.json"
                 filepath = file_system.get_dir() / "data" / filename
                 filepath.parent.mkdir(exist_ok=True)
-                
+
                 with open(filepath, "w", encoding="utf-8") as f:
                     json.dump(news_results, f, ensure_ascii=False, indent=2)
-                
+
                 # Add file reference to markdown
                 relative_path = str(filepath.relative_to(file_system.get_dir()))
                 md_content += f"\n> 📁 Full data saved to: [{filename}]({relative_path})\n"
-                
-                logger.info(f'📰 NewsNow trend data retrieved: {len(news_results)} sources, {sum(len(items) for items in news_results.values())} items')
-                
+
+                logger.info(
+                    f'📰 NewsNow trend data retrieved: {len(news_results)} sources, {sum(len(items) for items in news_results.values())} items')
+
                 return ActionResult(
                     extracted_content=md_content,
                     include_extracted_content_only_once=True,
                     long_term_memory=f'Retrieved trending news from {len(news_results)} sources with {sum(len(items) for items in news_results.values())} items'
                 )
-                
+
             except Exception as e:
                 error_msg = f'❌ Failed to retrieve NewsNow trending data: {str(e)}'
                 logger.error(error_msg)
                 return ActionResult(error=error_msg, extracted_content=error_msg)
+
+    def _register_workflow_skills(self):
+        """
+        Register workflow skills for searching and executing workflows
+        """
+
+        @self.registry.action(
+            'Search available workflows by keywords or workflow ID. Returns workflow information including adjustable parameters.',
+            param_model=SearchWorkflowsAction,
+        )
+        async def search_workflows(params: SearchWorkflowsAction):
+            """
+            Search workflows from shared_state.workflow_skills
+            
+            Returns workflow information including:
+            - workflow_id (last 4 digits)
+            - workflow_name
+            - workflow_description
+            - adjustable components with input parameters
+            """
+            try:
+                from vibe_surf.backend.shared_state import workflow_skills
+
+                # Get all workflows
+                all_workflows = workflow_skills
+
+                if not all_workflows:
+                    return ActionResult(
+                        extracted_content="No workflows available. Please configure workflows in the skill management system.",
+                        long_term_memory="No workflows configured"
+                    )
+
+                # Filter workflows
+                filtered_workflows = {}
+
+                # If workflow_id is provided, prioritize it
+                if params.workflow_id:
+                    for flow_id, workflow_data in all_workflows.items():
+                        if flow_id.endswith(params.workflow_id):
+                            filtered_workflows[flow_id] = workflow_data
+                            break
+
+                # If no workflow_id match or not provided, search by keywords
+                if not filtered_workflows:
+                    # Check if we should return all workflows
+                    if not params.key_words or params.key_words.strip() in ['', 'None', '*']:
+                        filtered_workflows = all_workflows
+                    else:
+                        # Filter by keywords
+                        keywords = [kw.strip().lower() for kw in params.key_words.split(',')]
+                        for flow_id, workflow_data in all_workflows.items():
+                            name = workflow_data.get('name', '').lower()
+                            description = workflow_data.get('description', '').lower()
+                            search_text = f"{name} {description}"
+
+                            if any(keyword in search_text for keyword in keywords):
+                                filtered_workflows[flow_id] = workflow_data
+
+                if not filtered_workflows:
+                    return ActionResult(
+                        extracted_content=f"No workflows found matching criteria. Keywords: {params.key_words}, Workflow ID: {params.workflow_id}",
+                        long_term_memory="No matching workflows found"
+                    )
+
+                # Format results
+                result_text = f"# Available Workflows ({len(filtered_workflows)} found)\n\n"
+
+                for flow_id, workflow_data in filtered_workflows.items():
+                    flow_id_short = flow_id[-4:]
+                    workflow_name = workflow_data.get('name', 'Unnamed Workflow')
+                    workflow_desc = workflow_data.get('description', 'No description')
+                    workflow_expose_config = workflow_data.get('workflow_expose_config', {})
+
+                    result_text += f"## @flow-{flow_id_short}: {workflow_name}\n\n"
+                    result_text += f"**Full ID:** {flow_id}\n\n"
+                    result_text += f"**Description:** {workflow_desc}\n\n"
+
+                    # List adjustable parameters
+                    if workflow_expose_config:
+                        result_text += "**Adjustable Parameters:**\n\n"
+
+                        for component_id, component_data in workflow_expose_config.items():
+                            component_name = component_data.get('component_name', component_id)
+                            inputs = component_data.get('inputs', {})
+
+                            # Only show exposed inputs
+                            exposed_inputs = {k: v for k, v in inputs.items() if v.get('is_expose', False)}
+
+                            if exposed_inputs:
+                                result_text += f"- **{component_name}** (`{component_id}`):\n"
+
+                                for input_name, input_data in exposed_inputs.items():
+                                    display_name = input_data.get('display_name', input_name)
+                                    input_type = input_data.get('type', 'str')
+                                    info = input_data.get('info', '')
+                                    current_value = input_data.get('value', '')
+
+                                    result_text += f"  - `{input_name}` ({display_name})\n"
+                                    result_text += f"    - Type: {input_type}\n"
+                                    if info:
+                                        result_text += f"    - Description: {info}\n"
+                                    result_text += f"    - Current/Default Value: {current_value}\n"[:100]
+                    else:
+                        result_text += "**No adjustable parameters configured**\n\n"
+
+                    result_text += "\n---\n\n"
+
+                # Add usage example
+                result_text += "\n### Usage Example\n\n"
+                result_text += "To execute a workflow, use `execute_workflow` with:\n"
+                result_text += "```json\n"
+                result_text += "{\n"
+                result_text += '  "workflow_id": "1234",  // Last 4 digits\n'
+                result_text += '  "tweak_params": "{\\"TextInput-uU4Rl\\": {\\"input_value\\": \\"VibeSurf\\"}}"\n'
+                result_text += "}\n"
+                result_text += "```\n"
+
+                logger.info(f'🔍 Found {len(filtered_workflows)} workflows')
+                return ActionResult(
+                    extracted_content=result_text,
+                    include_extracted_content_only_once=True,
+                    long_term_memory=f'Found {len(filtered_workflows)} workflows'
+                )
+
+            except Exception as e:
+                error_msg = f'❌ Failed to search workflows: {str(e)}'
+                logger.error(error_msg)
+                return ActionResult(error=error_msg, extracted_content=error_msg)
+
+        @self.registry.action(
+            'Execute a workflow with optional parameter tweaks',
+            param_model=ExecuteWorkflowAction,
+        )
+        async def execute_workflow(params: ExecuteWorkflowAction):
+            """
+            Execute a workflow using simple_run_flow from langflow endpoints
+            
+            Uses tweak_params to customize workflow inputs
+            """
+            try:
+                from vibe_surf.backend.shared_state import workflow_skills
+                from vibe_surf.langflow.api.v1.endpoints import simple_run_flow
+                from vibe_surf.langflow.api.v1.schemas import SimplifiedAPIRequest
+                from vibe_surf.langflow.services.deps import session_scope
+                from vibe_surf.langflow.services.auth.utils import create_super_user
+                from vibe_surf.langflow.api.v1.flows import _read_flow
+                from uuid import UUID
+
+                # Find the full workflow ID
+                full_flow_id = None
+                for flow_id in workflow_skills.keys():
+                    if flow_id.endswith(params.workflow_id):
+                        full_flow_id = flow_id
+                        break
+
+                if not full_flow_id:
+                    return ActionResult(
+                        error=f'Workflow with ID ending in "{params.workflow_id}" not found',
+                        extracted_content=f'Workflow with ID ending in "{params.workflow_id}" not found'
+                    )
+
+                # Parse tweak_params
+                tweaks = {}
+                if params.tweak_params:
+                    try:
+                        from json_repair import repair_json
+                        tweaks = json.loads(repair_json(params.tweak_params))
+                    except json.JSONDecodeError as e:
+                        return ActionResult(
+                            error=f'Invalid tweak_params JSON: {str(e)}',
+                            extracted_content=f'Invalid tweak_params JSON: {str(e)}'
+                        )
+
+                # Get the flow from database
+                try:
+                    flow_uuid = UUID(full_flow_id)
+                except ValueError:
+                    return ActionResult(
+                        error=f'Invalid flow ID format: {full_flow_id}',
+                        extracted_content=f'Invalid flow ID format: {full_flow_id}'
+                    )
+
+                # Get settings for authentication
+                from vibe_surf.langflow.services.deps import get_settings_service
+                settings_service = get_settings_service()
+                username = settings_service.auth_settings.SUPERUSER
+                password = settings_service.auth_settings.SUPERUSER_PASSWORD
+
+                # Fetch workflow from langflow database
+                async with session_scope() as langflow_session:
+                    current_user = await create_super_user(db=langflow_session, username=username, password=password)
+                    db_flow = await _read_flow(session=langflow_session, flow_id=flow_uuid, user_id=current_user.id)
+
+                    if not db_flow:
+                        return ActionResult(
+                            error=f'Workflow not found in database: {full_flow_id}',
+                            extracted_content=f'Workflow not found in database: {full_flow_id}'
+                        )
+
+                    # Create request with tweaks
+                    input_request = SimplifiedAPIRequest(
+                        input_value=None,
+                        input_type="chat",
+                        output_type="any",
+                        tweaks=tweaks,
+                    )
+
+                    # Execute workflow
+                    result = await simple_run_flow(
+                        flow=db_flow,
+                        input_request=input_request,
+                        stream=False,
+                        api_key_user=current_user,
+                    )
+
+                    # Format result
+                    workflow_name = workflow_skills[full_flow_id].get('name', 'Workflow')
+                    result_text = f"# Workflow Execution Result\n\n"
+                    result_text += f"**Workflow:** @flow-{params.workflow_id}: {workflow_name}\n\n"
+                    result_text += f"**Status:** ✅ Completed\n\n"
+                    
+                    if result.outputs:
+                        result_text += "**Results:**\n\n"
+                        # result.outputs is list[RunOutputs]
+                        for outer_idx, run_output in enumerate(result.outputs, 1):
+                            # run_output.outputs is list[ResultData]
+                            for inner_idx, result_data_org in enumerate(run_output.outputs, 1):
+                                # Extract results from ResultData
+                                results_data = result_data_org.results
+                                component_display_name = result_data_org.component_display_name
+                                component_id = result_data_org.component_id
+                                try:
+                                    if "text" in results_data:
+                                        results_data_str = results_data["text"].data["text"]
+                                    elif "output_data" in results_data:
+                                        results_data_str = results_data["output_data"].data
+                                    else:
+                                        results_data_str = results_data
+                                except Exception as e:
+                                    results_data_str = results_data
+                                result_text += f"### Result of {component_id}-{component_display_name}\n\n"
+                                result_text += f"{results_data_str}\n\n"
+                    
+                    logger.info(f'✅ Successfully executed workflow: {full_flow_id}')
+                    return ActionResult(
+                        extracted_content=result_text,
+                        include_extracted_content_only_once=True,
+                        long_term_memory=f'Executed workflow: {workflow_name}'
+                    )
+
+            except Exception as e:
+                error_msg = f'❌ Failed to execute workflow: {str(e)}'
+                logger.error(error_msg)
+                import traceback
+                traceback.print_exc()
+                return ActionResult(error=error_msg, extracted_content=error_msg)
+
+    def _register_api_skills(self):
+        """
+        Register unified website API skills (Xiaohongshu, Weibo, Zhihu, Douyin, YouTube)
+        """
+        from vibe_surf.tools.website_api_skills import get_api_params, call_api
+
+        @self.registry.action(
+            'Get API parameters and available methods for website platforms.',
+            param_model=GetApiParamsAction,
+        )
+        async def get_website_api_params(params: GetApiParamsAction):
+            """
+            Get API parameters for supported website platforms
+            
+            Returns the API schema and available methods for the specified platform
+            """
+            return await get_api_params(params)
+
+        @self.registry.action(
+            '',
+            param_model=CallApiAction,
+        )
+        async def call_website_api(
+                params: CallApiAction,
+                browser_manager: BrowserManager,
+                file_system: CustomFileSystem
+        ):
+            """
+            Call website platform API with unified handling
+            
+            Supports: Xiaohongshu (xhs), Weibo, Zhihu, Douyin, YouTube
+            """
+            return await call_api(params, browser_manager, file_system)
 
     def _register_extra_tools(self):
         """

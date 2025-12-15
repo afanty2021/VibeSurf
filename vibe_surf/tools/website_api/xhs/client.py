@@ -11,6 +11,7 @@ from tenacity import retry, stop_after_attempt, wait_fixed
 from xhshow import Xhshow
 from vibe_surf.browser.agent_browser_session import AgentBrowserSession
 from vibe_surf.logger import get_logger
+from vibe_surf.tools.website_api.base_client import BaseAPIClient
 
 from .helpers import (
     generate_trace_id, create_session_id, create_signature_headers,
@@ -35,13 +36,14 @@ class ContentType:
     IMAGE = 2
 
 
-class XiaoHongShuApiClient:
+class XiaoHongShuApiClient(BaseAPIClient):
     """
     XiaoHongShu API client with integrated browser session management.
     This client handles API communication through browser session for authentication.
     """
 
     def __init__(self, browser_session: AgentBrowserSession, timeout: int = 60, proxy: Optional[str] = None):
+        super().__init__(browser_session, timeout, proxy)
         """
         Initialize the RedBook API client
         
@@ -269,8 +271,8 @@ class XiaoHongShuApiClient:
             session_id: Optional[str] = None,
             page: int = 1,
             page_size: int = 20,
-            sort_type: str = SearchType.GENERAL,
-            content_type: int = ContentType.ALL,
+            sort_type: str = "popularity_descending",
+            content_type: int = 0,
     ) -> List[Dict]:
         """
         Search content by keyword
@@ -312,12 +314,12 @@ class XiaoHongShuApiClient:
             tag_list = note_card.get('tag_list', [])
 
             note_data = {
-                "note_id": note_card.get("note_id"),
+                "note_id": item.get("id"),
                 "type": note_card.get("type"),
                 "title": note_card.get("display_title", "")[:255],
                 "desc": note_card.get("desc", ""),
-                "time": note_card.get("time"),
-                "last_update_time": note_card.get("last_update_time", 0),
+                "time": item.get("time"),
+                "last_update_time": item.get("last_update_time", 0),
                 "user_id": user_info.get("user_id"),
                 "nickname": user_info.get("nickname"),
                 "avatar": user_info.get("avatar"),
@@ -454,7 +456,7 @@ class XiaoHongShuApiClient:
             content_id: str,
             xsec_token: str,
             fetch_interval: float = 1.0,
-            max_comments: int = 1000,
+            max_comments: int = 50,
     ) -> List[Dict]:
         """
         Fetch all comments for content (including pagination)

@@ -14,6 +14,7 @@ from youtube_transcript_api import YouTubeTranscriptApi
 
 from vibe_surf.browser.agent_browser_session import AgentBrowserSession
 from vibe_surf.logger import get_logger
+from vibe_surf.tools.website_api.base_client import BaseAPIClient
 
 from .helpers import (
     SearchType, SortType, Duration, UploadDate,
@@ -31,13 +32,14 @@ from .helpers import (
 logger = get_logger(__name__)
 
 
-class YouTubeApiClient:
+class YouTubeApiClient(BaseAPIClient):
     """
     YouTube API client with integrated browser session management.
     This client handles API communication through browser session for authentication.
     """
 
     def __init__(self, browser_session: AgentBrowserSession, timeout: int = 60, proxy: Optional[str] = None):
+        super().__init__(browser_session, timeout, proxy)
         """
         Initialize the YouTube API client
 
@@ -1155,50 +1157,6 @@ class YouTubeApiClient:
 
         except Exception as e:
             logger.error(f"Failed to get channel videos for {channel_id}: {e}")
-            return []
-
-    async def get_trending_videos(self) -> List[Dict]:
-        """
-        Get trending YouTube videos
-        
-        Args:
-            max_videos: Maximum number of videos to fetch
-            
-        Returns:
-            List of simplified trending video information
-        """
-        try:
-            data = {"browseId": "FEtrending"}
-
-            response = await self._make_api_request("browse", data)
-
-            videos = []
-
-            # Navigate to trending video list
-            contents = response.get("contents", {}).get("twoColumnBrowseResultsRenderer", {}).get("tabs", [])
-            for tab in contents:
-                tab_content = tab.get("tabRenderer", {}).get("content", {})
-                sections = tab_content.get("sectionListRenderer", {}).get("contents", [])
-
-                for section in sections:
-                    items_up = section.get("itemSectionRenderer", {}).get("contents", [])
-                    for item_up in items_up:
-                        items = item_up.get('shelfRenderer', {}).get(
-                            'content').get('expandedShelfContentsRenderer').get('items', [])
-                        for item in items:
-                            # Check for different video renderer types
-                            video_data = (item.get("videoRenderer") or
-                                          item.get("compactVideoRenderer") or
-                                          item.get("gridVideoRenderer"))
-                            if video_data:
-                                video_info = self._extract_video_info(video_data)
-                                if video_info:
-                                    videos.append(video_info)
-
-            return videos
-
-        except Exception as e:
-            logger.error(f"Failed to get trending videos: {e}")
             return []
 
     async def get_video_transcript(self, video_id: str, languages: Optional[List[str]] = None) -> Optional[

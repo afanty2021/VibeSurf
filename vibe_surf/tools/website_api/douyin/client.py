@@ -19,6 +19,7 @@ except ImportError:
 
 from vibe_surf.browser.agent_browser_session import AgentBrowserSession
 from vibe_surf.logger import get_logger
+from vibe_surf.tools.website_api.base_client import BaseAPIClient
 
 from .helpers import (
     SearchChannelType, SearchSortType, PublishTimeType,
@@ -32,13 +33,14 @@ from .helpers import (
 logger = get_logger(__name__)
 
 
-class DouyinApiClient:
+class DouyinApiClient(BaseAPIClient):
     """
     Douyin API client with integrated browser session management.
     This client handles API communication through browser session for authentication.
     """
 
     def __init__(self, browser_session: AgentBrowserSession, timeout: int = 60, proxy: Optional[str] = None):
+        super().__init__(browser_session, timeout, proxy)
         """
         Initialize the Douyin API client
         
@@ -291,9 +293,9 @@ class DouyinApiClient:
             self,
             keyword: str,
             offset: int = 0,
-            search_channel: SearchChannelType = SearchChannelType.GENERAL,
-            sort_type: SearchSortType = SearchSortType.GENERAL,
-            publish_time: PublishTimeType = PublishTimeType.UNLIMITED,
+            search_channel: str = 'aweme_general',
+            sort_type: int = 1,  # MOST_LIKED
+            publish_time: int = 0,
             search_id: str = "",
     ) -> List[Dict]:
         """
@@ -311,7 +313,7 @@ class DouyinApiClient:
             List of simplified aweme data
         """
         query_params = {
-            'search_channel': search_channel.value,
+            'search_channel': search_channel,
             'enable_history': '1',
             'keyword': keyword,
             'search_source': 'tab_search',
@@ -325,10 +327,10 @@ class DouyinApiClient:
         }
 
         # Add filters if not default
-        if sort_type.value != SearchSortType.GENERAL.value or publish_time.value != PublishTimeType.UNLIMITED.value:
+        if sort_type != SearchSortType.GENERAL.value or publish_time != PublishTimeType.UNLIMITED.value:
             query_params["filter_selected"] = json.dumps({
-                "sort_type": str(sort_type.value),
-                "publish_time": str(publish_time.value)
+                "sort_type": str(sort_type),
+                "publish_time": str(publish_time)
             })
             query_params["is_filter_search"] = 1
             query_params["search_source"] = "tab_search"
