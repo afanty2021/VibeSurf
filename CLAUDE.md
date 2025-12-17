@@ -1,6 +1,6 @@
 # VibeSurf - AI 智能浏览器助手
 
-> 更新时间：2025-12-15 11:00:00
+> 更新时间：2025-12-17 12:00:00
 > 项目地址：https://github.com/vibesurf-ai/VibeSurf
 
 ## 项目简介
@@ -74,7 +74,7 @@ VibeSurf 是一个开源的 AI 驱动的智能浏览器助手，专注于浏览�
 
 ### 第三方集成
 - **Composio**: 与数百个流行工具集成（Gmail、Notion、GitHub 等）
-- **原生 API**: 小红书、抖音、微博、YouTube、知乎等平台
+- **原生 API**: 小红书、抖音、微博、YouTube、知乎、NewsNow等平台
 - **Firecrawl**: 网页数据提取
 - **AssemblyAI**: 语音识别和转录
 
@@ -96,12 +96,15 @@ vibesurf/
 │   │   │   ├── douyin/      # 抖音 API
 │   │   │   ├── weibo/       # 微博 API
 │   │   │   ├── youtube/     # YouTube API
-│   │   │   └── zhihu/       # 知乎 API
+│   │   │   ├── zhihu/       # 知乎 API
+│   │   │   └── newsnow/     # NewsNow API
 │   │   ├── website_api_skills.py # 网站 API 技能封装
 │   │   └── ...              # 其他工具
-│   ├── workflows/            # 预定义工作流
+│   ├── workflows/            # 预定义工作流 (80+ 个工作流)
 │   │   ├── FileSystem/      # 文件系统操作工作流
 │   │   ├── Integrations/    # 平台集成工作流
+│   │   ├── AIGC/           # AI 生成内容工作流
+│   │   ├── Browser/        # 浏览器自动化工作流
 │   │   └── VibeSurf/        # VibeSurf 核心工作流
 │   └── telemetry/            # 遥测和监控
 ├── tests/                    # 测试文件
@@ -191,7 +194,8 @@ vibesurf/
 - **数据提取**: 结构化数据提取和导出
 
 ### 4. 平台集成
-- **社交媒体**: 小红书、抖音、微博、YouTube 等平台
+- **社交媒体**: 小红书、抖音、微博、YouTube、知乎等平台
+- **新闻资讯**: NewsNow 等新闻聚合平台
 - **生产力工具**: Gmail、Notion、Google Calendar、Slack 等
 - **开发工具**: GitHub、Trello 等开发平台
 - **自定义集成**: 支持添加自定义 API 集成
@@ -355,6 +359,11 @@ DEBUG=false
 - [x] 工作流技能系统（技能暴露和管理）
 - [x] 文件系统操作工作流
 - [x] 知乎平台集成
+- [x] NewsNow 新闻平台集成
+- [x] 数据输出组件优化
+- [x] 工作流技能暴露API完善
+- [x] 加密功能优化
+- [x] 浏览器结果处理改进
 
 ### 进行中 🚧
 - [ ] 强大的编程代理
