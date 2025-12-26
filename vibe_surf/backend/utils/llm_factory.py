@@ -99,9 +99,13 @@ def create_llm_from_profile(llm_profile) -> BaseChatModel:
             )
 
         elif provider == "google":
+            http_options = {}
+            if base_url:
+                http_options["base_url"] = base_url
             return ChatGoogle(
                 model=model,
                 api_key=api_key,
+                http_options=http_options,
                 **common_params
             )
 
@@ -181,6 +185,14 @@ def create_llm_from_profile(llm_profile) -> BaseChatModel:
             return ChatOpenAICompatible(
                 model=model,
                 base_url="https://dashscope.aliyuncs.com/compatible-mode/v1" or base_url,
+                api_key=api_key,
+                **common_params
+            )
+
+        elif provider == "glm":
+            return ChatOpenAICompatible(
+                model=model,
+                base_url="https://open.bigmodel.cn/api/paas/v4" or base_url,
                 api_key=api_key,
                 **common_params
             )

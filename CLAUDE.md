@@ -1,431 +1,344 @@
-# VibeSurf - AI 智能浏览器助手
+# CLAUDE.md
 
-> 更新时间：2025-12-17 12:00:00
-> 项目地址：https://github.com/vibesurf-ai/VibeSurf
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 项目简介
+## Project Overview
 
-VibeSurf 是一个开源的 AI 驱动的智能浏览器助手，专注于浏览器自动化和智能研究。它结合了先进的 AI 技术、多代理并行处理和直观的工作流系统，为用户提供强大而高效的浏览器操作体验。
+VibeSurf is an AI agentic browser built with Python (backend) and React/TypeScript (frontend). It combines browser automation with AI intelligence through a multi-agent system, visual workflow builder, and Chrome extension integration.
 
-## 核心特性
+**Core Stack:**
+- Backend: FastAPI, LangGraph/LangChain, browser-use, SQLAlchemy, Uvicorn
+- Frontend: React 18, TypeScript, Vite, Tailwind CSS, XYFlow (ReactFlow)
+- Browser: Chrome DevTools Protocol (CDP), Playwright
+- Python: 3.11+ (recommended 3.12)
+- Package Manager: uv (0.7.20)
 
-### 🧠 高级 AI 自动化
-- 超越传统浏览器自动化，支持深度研究、智能爬虫、内容摘要等功能
-- 集成多个 AI 模型提供商（OpenAI、Google Gemini、Anthropic Claude 等）
-- 支持本地 LLM（如 Ollama）确保隐私安全
+## Development Commands
 
-### 🚀 多代理并行处理
-- 在不同的浏览器标签页中同时运行多个 AI 代理
-- 实现深度研究和广度研究的巨大效率提升
-- 支持分布式任务执行
+### Backend Development
 
-### 🔄 智能浏览器工作流
-- 拖拽式和对话式自定义工作流创建
-- 结合确定性自动化与 AI 智能决策
-- 适用于自动登录、数据收集、社交媒体发布等重复性任务
-
-### 🎨 原生 Chrome 扩展 UI
-- 无缝的浏览器集成，无需切换应用
-- 直观的用户界面，如同浏览器原生功能
-- 支持实时交互和状态显示
-
-### 🔒 隐私优先的 LLM 支持
-- 支持本地 LLM 部署（Ollama 等）
-- 支持自定义 LLM API
-- 确保浏览数据的隐私和安全
-
-### 🛠️ 工作流技能系统
-- 将工作流输入暴露为可复用的技能
-- 支持技能配置和管理
-- 工作流技能的动态加载和执行
-
-### 📁 文件系统操作
-- 完整的文件系统工作流支持（读取、写入、复制、移动等）
-- 文件内容搜索和替换
-- 目录创建和管理
-
-## 技术架构
-
-### 编程语言
-- **Python 3.11+**: 主要后端开发语言
-- **TypeScript**: 前端和 Chrome 扩展开发
-- **JavaScript**: 部分前端交互功能
-
-### 核心框架与库
-- **LangGraph**: AI 工作流编排
-- **LangChain**: AI 应用开发框架
-- **FastAPI**: 后端 API 服务
-- **Browser-use**: 浏览器自动化核心
-- **UVicorn**: ASGI 服务器
-- **React**: 前端 UI 框架
-
-### AI/ML 集成
-- **OpenAI API**: GPT 系列模型
-- **Google Gemini**: Google 的 AI 模型
-- **Anthropic Claude**: Claude AI 模型
-- **本地 LLM 支持**: Ollama 等本地部署方案
-- **多提供商支持**: 通过 LiteLLM 统一接口
-
-### 数据存储与处理
-- **SQLite**: 本地数据存储
-- **DuckDB**: 高性能分析数据库
-- **Pandas**: 数据处理和分析
-- **Redis**: 缓存和会话管理
-
-### 第三方集成
-- **Composio**: 与数百个流行工具集成（Gmail、Notion、GitHub 等）
-- **原生 API**: 小红书、抖音、微博、YouTube、知乎、NewsNow等平台
-- **Firecrawl**: 网页数据提取
-- **AssemblyAI**: 语音识别和转录
-
-## 项目结构
-
-```
-vibesurf/
-├── vibe_surf/                 # 主要源代码目录
-│   ├── agents/               # AI 代理实现
-│   ├── backend/              # FastAPI 后端服务
-│   ├── browser/              # 浏览器控制和自动化
-│   ├── chrome_extension/     # Chrome 扩展源码
-│   ├── frontend/             # React 前端应用
-│   ├── langflow/             # LangFlow 集成
-│   ├── llm/                  # LLM 模型管理
-│   ├── tools/                # 工具和实用程序
-│   │   ├── website_api/      # 各网站 API 集成
-│   │   │   ├── xhs/         # 小红书 API
-│   │   │   ├── douyin/      # 抖音 API
-│   │   │   ├── weibo/       # 微博 API
-│   │   │   ├── youtube/     # YouTube API
-│   │   │   ├── zhihu/       # 知乎 API
-│   │   │   └── newsnow/     # NewsNow API
-│   │   ├── website_api_skills.py # 网站 API 技能封装
-│   │   └── ...              # 其他工具
-│   ├── workflows/            # 预定义工作流 (80+ 个工作流)
-│   │   ├── FileSystem/      # 文件系统操作工作流
-│   │   ├── Integrations/    # 平台集成工作流
-│   │   ├── AIGC/           # AI 生成内容工作流
-│   │   ├── Browser/        # 浏览器自动化工作流
-│   │   └── VibeSurf/        # VibeSurf 核心工作流
-│   └── telemetry/            # 遥测和监控
-├── tests/                    # 测试文件
-├── docs/                     # 项目文档
-├── scripts/                  # 构建和部署脚本
-└── assets/                   # 静态资源
-```
-
-## 快速开始
-
-### 环境要求
-- Python 3.11 或更高版本
-- Node.js 16+（用于前端构建）
-- Chrome 浏览器（用于浏览器自动化）
-
-### 安装步骤
-
-1. **安装 uv 包管理器**
-   ```bash
-   # macOS/Linux
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-
-   # Windows
-   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
-   ```
-
-2. **安装 VibeSurf**
-   ```bash
-   uv pip install vibesurf -U
-   ```
-
-3. **启动 VibeSurf**
-   ```bash
-   uv run vibesurf
-   ```
-
-### 开发环境设置
-
-1. **克隆仓库**
-   ```bash
-   git clone https://github.com/vibesurf-ai/VibeSurf.git
-   cd VibeSurf
-   ```
-
-2. **设置虚拟环境**
-   ```bash
-   uv venv --python 3.12
-   source .venv/bin/activate  # Windows: .venv\Scripts\activate
-   uv pip install -e .
-   ```
-
-3. **构建前端（可选）**
-   ```bash
-   cd vibe_surf/frontend
-   npm ci
-   npm run build
-   mkdir -p ../backend/frontend
-   cp -r build/* ../backend/frontend/
-   ```
-
-4. **启动开发服务器**
-   ```bash
-   # 直接启动服务器
-   uvicorn vibe_surf.backend.main:app --host 127.0.0.1 --port 9335
-
-   # 或使用 CLI 命令
-   uv run vibesurf
-   ```
-
-## 核心功能模块
-
-### 1. 智能代理系统
-- **多代理并行**: 支持同时在多个标签页运行不同代理
-- **任务分发**: 智能分配任务给最适合的代理
-- **协作机制**: 代理间可以共享信息和协作完成任务
-
-### 2. 工作流引擎
-- **可视化编辑**: 拖拽式工作流设计器
-- **条件分支**: 支持基于条件的逻辑分支
-- **循环控制**: 可配置的循环和迭代操作
-- **错误处理**: 完善的错误捕获和恢复机制
-
-### 3. 浏览器自动化
-- **元素定位**: 智能元素识别和定位
-- **交互模拟**: 点击、输入、滚动等用户操作模拟
-- **页面导航**: 复杂的页面跳转和导航逻辑
-- **数据提取**: 结构化数据提取和导出
-
-### 4. 平台集成
-- **社交媒体**: 小红书、抖音、微博、YouTube、知乎等平台
-- **新闻资讯**: NewsNow 等新闻聚合平台
-- **生产力工具**: Gmail、Notion、Google Calendar、Slack 等
-- **开发工具**: GitHub、Trello 等开发平台
-- **自定义集成**: 支持添加自定义 API 集成
-
-## 使用场景
-
-### 1. 市场研究
-- 自动化收集竞品信息
-- 监控行业动态和趋势
-- 生成分析报告和摘要
-
-### 2. 内容管理
-- 批量发布内容到多个平台
-- 自动化内容审核和分类
-- 定时发布和互动管理
-
-### 3. 数据采集
-- 网站数据批量抓取
-- 结构化数据提取和存储
-- 实时数据监控和更新
-
-### 4. 工作自动化
-- 自动登录和会话管理
-- 表单填写和提交
-- 报告生成和邮件发送
-
-## API 设计
-
-### REST API 端点
-- `POST /api/agents/create`: 创建新的 AI 代理
-- `POST /api/workflows/run`: 执行工作流
-- `GET /api/browser/status`: 获取浏览器状态
-- `POST /api/browser/navigate`: 导航到指定 URL
-- `POST /api/tools/execute`: 执行工具操作
-- `POST /api/skill/expose`: 配置工作流技能暴露
-- `GET /api/skill/{flow_id}`: 获取工作流技能配置
-
-### WebSocket 事件
-- `agent:update`: 代理状态更新
-- `workflow:progress`: 工作流执行进度
-- `browser:screenshot`: 浏览器截图更新
-- `system:notification`: 系统通知
-
-## 配置管理
-
-### 环境变量
 ```bash
-# API 密钥
-OPENAI_API_KEY=your_openai_key
-GOOGLE_API_KEY=your_google_key
-ANTHROPIC_API_KEY=your_anthropic_key
+# Install dependencies (development mode)
+uv venv --python 3.12
+source .venv/bin/activate  # Linux/macOS
+.venv\Scripts\activate     # Windows
+uv pip install -e .
 
-# 浏览器配置
-BROWSER_HEADLESS=false
-BROWSER_USER_DATA_DIR=/path/to/profile
+# Start backend server (option 1 - direct)
+uvicorn vibe_surf.backend.main:app --host 127.0.0.1 --port 9335
 
-# 服务器配置
-HOST=127.0.0.1
-PORT=9335
-DEBUG=false
+# Start backend server (option 2 - CLI)
+uv run vibesurf
+
+# For production users (no install)
+uvx vibesurf
 ```
 
-### 配置文件
-主配置文件位于 `~/.vibesurf/config.yaml`，包含：
-- 代理偏好设置
-- 工作流模板
-- 集成平台配置
-- 性能优化参数
+### Frontend Development
 
-## 性能优化
+```bash
+cd vibe_surf/frontend
 
-### 1. 并发处理
-- 使用异步 I/O 提高并发性能
-- 智能资源调度和负载均衡
-- 连接池和缓存机制
+# Install dependencies
+npm ci
 
-### 2. 内存管理
-- 自动垃圾回收
-- 内存使用监控
-- 资源泄漏检测
+# Development server (proxies to backend at port 7860)
+npm start
 
-### 3. 缓存策略
-- 多级缓存架构
-- 智能缓存失效
-- 分布式缓存支持
+# Build for production
+npm run build
 
-## 监控与日志
+# Copy build to backend directory
+mkdir -p ../backend/frontend
+cp -r build/* ../backend/frontend/
 
-### 1. 性能监控
-- CPU、内存、网络使用率
-- API 响应时间统计
-- 错误率和成功率跟踪
+# Run tests
+npm test
+npm run test:coverage
+npm run test:watch
 
-### 2. 日志系统
-- 结构化日志记录
-- 日志级别过滤
-- 日志轮转和归档
+# Linting and formatting
+npm run format              # Auto-fix with Biome
+npm run check-format        # Check only
+npm run type-check          # TypeScript type checking
+```
 
-### 3. 遥测数据
-- OpenTelemetry 集成
-- Prometheus 指标导出
-- 分布式链路追踪
+### Database Migrations
 
-## 安全考虑
+VibeSurf uses Alembic for database migrations (Langflow integration):
 
-### 1. 数据隐私
-- 本地数据加密存储
-- API 密钥安全管理
-- 敏感信息脱敏
+```bash
+# Location: vibe_surf/langflow/alembic/
+# Migrations run automatically on backend startup
+# Database: SQLite at {workspace}/langflow.db
+```
 
-### 2. 访问控制
-- 用户认证和授权
-- API 访问限制
-- 操作审计日志
+## Architecture
 
-### 3. 浏览器安全
-- 沙箱隔离执行
-- 恶意网站检测
-- 内容安全策略
+### Multi-Agent System
 
-## 测试策略
+VibeSurf orchestrates multiple AI agents using LangGraph state machines:
 
-### 1. 单元测试
-- 核心功能模块测试
-- Mock 外部依赖
-- 边界条件测试
+1. **VibeSurfAgent** (`vibe_surf/agents/vibe_surf_agent.py`)
+   - Main orchestrator that coordinates multiple browser agents
+   - Manages parallel execution across browser tabs
+   - Built on LangGraph for state management
 
-### 2. 集成测试
-- API 端到端测试
-- 浏览器自动化测试
-- 第三方集成测试
+2. **BrowserUseAgent** (`vibe_surf/agents/browser_use_agent.py`)
+   - Extends browser-use's Agent class
+   - Handles individual browser automation tasks
+   - Integrates custom tools and file system access
 
-### 3. 性能测试
-- 负载测试和压力测试
-- 内存泄漏检测
-- 并发性能基准
+3. **ReportWriterAgent** (`vibe_surf/agents/report_writer_agent.py`)
+   - Specialized for content summarization and report generation
 
-## 部署方案
+### Backend API Structure
 
-### 1. 本地部署
-- 单机安装和运行
-- Docker 容器化部署
-- 系统服务配置
+The FastAPI backend (`vibe_surf/backend/main.py`) is organized into routers:
 
-### 2. 云端部署
-- AWS/GCP/Azure 部署
-- Kubernetes 集群部署
-- 自动扩缩容配置
+- `/api/task` - Task execution and management
+- `/api/agent` - Agent operations and lifecycle
+- `/api/browser` - Browser control and session management
+- `/api/config` - LLM and voice profile configuration
+- `/api/composio` - Third-party app integrations (100+ tools)
+- `/api/skill` - AI skills registry (search, crawl, code execution)
+- `/api/vibesurf` - Core VibeSurf operations
+- `/api/schedule` - Scheduled task management
+- `/api/files` - File operations
+- `/api/activity` - Activity logging
+- `/api/voices` - Voice model (ASR/TTS) management
 
-### 3. 混合部署
-- 本地+云端混合架构
-- 数据同步和备份
-- 灾难恢复方案
+### Browser Architecture
 
-## 路线图
+**AgentBrowserSession** manages browser instances with:
+- Chrome DevTools Protocol (CDP) for low-level control
+- Profile isolation per agent
+- Watchdog monitoring for health checks
+- Extension loading (when Chrome version < 142)
 
-### 已完成 ✅
-- [x] 智能技能系统（搜索、爬虫、代码执行）
-- [x] 第三方平台集成（Composio）
-- [x] 智能浏览器工作流
-- [x] 工作流技能系统（技能暴露和管理）
-- [x] 文件系统操作工作流
-- [x] 知乎平台集成
-- [x] NewsNow 新闻平台集成
-- [x] 数据输出组件优化
-- [x] 工作流技能暴露API完善
-- [x] 加密功能优化
-- [x] 浏览器结果处理改进
+**Extension Integration:**
+- Location: `vibe_surf/chrome_extension/`
+- Manifest V3 with side panel UI
+- WebSocket communication with backend
+- Background service worker + content scripts
 
-### 进行中 🚧
-- [ ] 强大的编程代理
-- [ ] 智能记忆和个性化功能
+### Langflow Integration
 
-### 计划中 📋
-- [ ] 多语言支持
-- [ ] 移动端支持
-- [ ] 企业级功能
-- [ ] 插件生态系统
+VibeSurf embeds a fork of Langflow for visual workflow creation:
 
-## 贡献指南
+- Location: `vibe_surf/langflow/`
+- 100+ pre-built components in `components/` directory
+- Frontend at `vibe_surf/frontend/` (shared with VibeSurf UI)
+- Database migrations in `alembic/`
+- Component types: LLMs, agents, tools, data sources, embeddings
 
-### 1. 开发流程
-1. Fork 项目仓库
-2. 创建功能分支
-3. 编写代码和测试
-4. 提交 Pull Request
-5. 代码审查和合并
+### Workflow System
 
-### 2. 代码规范
-- 遵循 PEP 8 Python 代码规范
-- 使用 TypeScript 严格模式
-- 编写完整的文档字符串
-- 保持测试覆盖率 > 80%
+Pre-built workflow templates in `vibe_surf/workflows/`:
+- Categories: AIGC, Browser, FileSystem, Integrations, VibeSurf
+- Combine deterministic automation with AI intelligence
+- Minimize token consumption for repetitive tasks
 
-### 3. 社区参与
-- GitHub Issues: 报告 Bug 和功能请求
-- Discord 社区: 技术讨论和交流
-- 微信群: 中文用户交流
+### Tools and Skills
 
-## 许可证
+**Core Tools** (`vibe_surf/tools/`):
+- `browser_use_tools.py` - Browser automation primitives
+- `vibesurf_tools.py` - Search, crawl, JS code execution
+- `file_system.py` - File operations
+- `composio_client.py` - Integration with external apps
+- `website_api/` - Native APIs for social platforms (Xiaohongshu, Douyin, Weibo, YouTube)
+- `aigc/` - AI generation tools
 
-本项目采用 VibeSurf 开源许可证，基于 Apache 2.0 并附加额外条款。详见 [LICENSE](../LICENSE) 文件。
+**Skills** are higher-level capabilities registered via `/api/skill`:
+- `/search` - Quick information retrieval
+- `/crawl` - Website data extraction
+- `/code` - Execute JavaScript in browser context
 
-## 致谢
+### Database Models
 
-VibeSurf 基于以下优秀的开源项目：
-- [Browser Use](https://github.com/browser-use/browser-use)
-- [LangGraph](https://github.com/langchain-ai/langgraph)
-- [Langflow](https://github.com/langflow-ai/langflow)
+SQLAlchemy models (`vibe_surf/backend/database/models.py`):
 
-感谢所有贡献者和社区成员的支持！
+- **Task**: Execution records with status (pending, running, paused, completed, failed, stopped)
+- **LLMProfile**: LLM configurations with encrypted API keys
+- **VoiceProfile**: ASR/TTS model configurations
 
----
+Database location: `{workspace}/langflow.db` (SQLite)
 
-## AI 使用建议
+### LLM Provider Support
 
-### 开发模式
-1. **模块化开发**: 充分利用项目的模块化架构，专注于特定功能模块
-2. **API 设计**: 遵循 RESTful 设计原则，保持 API 的一致性和可扩展性
-3. **异步编程**: 大量使用 async/await 模式，提高并发性能
-4. **测试驱动**: 编写全面的测试用例，确保代码质量
+Multi-provider architecture with unified interface:
+- OpenAI, Anthropic, Google (Gemini), Azure OpenAI
+- DeepSeek, Mistral, Ollama (local)
+- Dashscope (Alibaba), Moonshot, SiliconFlow
+- IBM WatsonX, Groq, Cohere, HuggingFace
 
-### 技术决策
-1. **性能优先**: 在设计和实现中优先考虑性能影响
-2. **可扩展性**: 预留扩展接口，支持未来功能增强
-3. **用户体验**: 关注用户界面和交互体验的优化
-4. **安全性**: 始终将数据安全和用户隐私放在首位
+Configuration via environment variables or LLMProfile database records.
 
-### 最佳实践
-1. **代码复用**: 利用现有组件和工具，避免重复开发
-2. **文档同步**: 保持代码和文档的同步更新
-3. **版本管理**: 合理使用版本控制，便于协作和维护
-4. **持续集成**: 建立 CI/CD 流水线，自动化测试和部署
+## Environment Configuration
+
+Create `.env` file based on `.env.example`:
+
+**Critical Variables:**
+- LLM API keys (OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
+- `VIBESURF_BACKEND_PORT` - Backend server port (default: 9335)
+- `VIBESURF_EXTENSION` - Path to Chrome extension
+- `VIBESURF_WORKSPACE` - Data directory location
+- `BROWSER_EXECUTION_PATH` - Browser executable path
+- `ANONYMIZED_TELEMETRY` - Enable/disable telemetry (default: false)
+- `BROWSER_USE_LOGGING_LEVEL` - Logging verbosity (result | info | debug)
+
+**Configuration Priority:**
+1. `{workspace}/envs.json` (runtime configuration)
+2. Environment variables
+3. Defaults in code
+
+Workspace directory determined by `vibe_surf/common.py:get_workspace_dir()`.
+
+## Key Implementation Patterns
+
+### Agent State Management
+
+Agents use LangGraph's StateGraph for execution flow:
+- Nodes represent agent actions
+- Edges define state transitions
+- Checkpointers enable pause/resume
+- Streaming for real-time updates
+
+### Browser Session Lifecycle
+
+```python
+# 1. BrowserManager creates isolated profiles
+# 2. AgentBrowserSession wraps CDP connection
+# 3. Watchdog monitors health
+# 4. Session cleanup on completion/failure
+```
+
+### Tool Integration
+
+Tools follow LangChain's structured tool pattern:
+- Type-hinted parameters with Pydantic models
+- Async execution for I/O operations
+- Error handling with context preservation
+
+### Frontend-Backend Communication
+
+- REST API for CRUD operations
+- WebSocket for streaming agent outputs
+- Server-Sent Events (SSE) for workflow execution updates
+
+## Common Workflows
+
+### Adding a New LLM Provider
+
+1. Create provider client in `vibe_surf/llm/`
+2. Add to LLMProfile enum in `vibe_surf/backend/database/models.py`
+3. Update provider factory in relevant agent code
+4. Add API key to `.env.example`
+
+### Creating a Custom Tool
+
+1. Define tool in `vibe_surf/tools/`
+2. Implement async function with Pydantic model for parameters
+3. Register with `@tool` decorator (LangChain)
+4. Add to agent's tool list in `vibe_surf/agents/`
+
+### Building a New Workflow Template
+
+1. Create workflow JSON in `vibe_surf/workflows/{category}/`
+2. Use Langflow components from `vibe_surf/langflow/components/`
+3. Test in workflow builder UI
+4. Export and commit workflow file
+
+## Testing
+
+**Frontend Tests:**
+```bash
+cd vibe_surf/frontend
+npm test                    # Run Jest tests
+npm run test:coverage       # With coverage report
+npm run test:watch          # Watch mode
+```
+
+**Backend Tests:**
+No pytest configuration found - tests likely run via individual test files or manual testing.
+
+## Platform-Specific Notes
+
+**Windows:**
+- DLL dependencies for torch/onnxruntime: Install [Visual C++ Redistributable](https://aka.ms/vc14/vc_redist.x64.exe)
+- One-click installer available: `VibeSurf-Installer.exe`
+- Use backslash paths or raw strings for file operations
+
+**Chrome Extension Loading:**
+- Chrome 142+ removed `--load-extension` flag
+- Manual loading required: chrome://extensions → Developer mode → Load unpacked
+- Extension location: `vibe_surf/chrome_extension/`
+
+**Docker:**
+- Set `IN_DOCKER=true` for optimized browser configuration
+- Playwright browsers need proper installation in container
+
+## Debugging
+
+**Backend Debug Mode:**
+```bash
+# Enable verbose logging
+export VIBESURF_DEBUG=true
+export BROWSER_USE_LOGGING_LEVEL=debug
+
+# Start with debugger support
+python -m pdb -m vibe_surf.cli
+```
+
+**Frontend Debug:**
+- React DevTools for component inspection
+- Network tab for API calls (proxied to backend)
+- Console for workflow execution logs
+
+**Browser Automation:**
+- Set `BROWSER_USE_LOGGING_LEVEL=debug` for detailed browser actions
+- CDP messages logged when debug enabled
+- Browser stays open on error for inspection
+
+## Package Structure
+
+```
+vibe_surf/
+├── agents/              # AI agent implementations
+├── backend/             # FastAPI server
+│   ├── api/            # API routers
+│   ├── database/       # SQLAlchemy models
+│   └── frontend/       # Built React app (copied from vibe_surf/frontend/build)
+├── browser/            # Browser management
+├── chrome_extension/   # Chrome extension (Manifest V3)
+├── frontend/           # React TypeScript app (source)
+├── langflow/          # Workflow builder (Langflow fork)
+│   ├── alembic/       # Database migrations
+│   ├── components/    # 100+ workflow components
+│   └── services/      # Langflow backend services
+├── llm/               # LLM provider integrations
+├── tools/             # Agent tools
+├── workflows/         # Pre-built workflow templates
+├── cli.py            # CLI entry point
+└── common.py         # Shared utilities
+```
+
+## Telemetry
+
+VibeSurf collects anonymous usage data by default for product improvement:
+- CLI startup events
+- Agent execution metrics
+- Error reporting via Sentry (if configured)
+
+**Disable:**
+```bash
+export ANONYMIZED_TELEMETRY=false
+# or in .env
+ANONYMIZED_TELEMETRY=false
+```
+
+## Version Management
+
+- Version determined by git tags via `setuptools-scm`
+- Written to `vibe_surf/_version.py` on build
+- CLI displays version from `vibe_surf.__version__`
