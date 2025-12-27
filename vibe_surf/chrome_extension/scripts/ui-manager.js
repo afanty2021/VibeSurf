@@ -165,6 +165,23 @@ class VibeSurfUIManager {
       this.showNotification(data.message || 'Settings error occurred', 'error');
     });
 
+    this.settingsManager.on('languageChanged', (data) => {
+      console.log('[UIManager] Language changed to:', data.locale);
+      // Re-render profile lists when language changes
+      // Profile lists use window.i18n.getMessage() directly for translation
+      if (this.settingsManager.settingsProfiles) {
+        this.settingsManager.settingsProfiles.rerenderAllProfiles();
+      }
+      // Re-render workflows when language changes
+      if (this.settingsManager.settingsWorkflow) {
+        this.settingsManager.settingsWorkflow.rerenderAllWorkflows();
+      }
+      // Re-render toolkits when language changes
+      if (this.settingsManager.settingsIntegrations) {
+        this.settingsManager.settingsIntegrations.rerenderAllToolkits();
+      }
+    });
+
     this.settingsManager.on('confirmDeletion', (data) => {
       this.modalManager.showConfirmModal(
         'Delete Profile',
@@ -1592,8 +1609,8 @@ class VibeSurfUIManager {
     const welcomeHTML = `
       <div class="welcome-message">
         <div class="welcome-text">
-          <h4>Welcome to VibeSurf</h4>
-          <p>Let's vibe surfing the world with AI automation</p>
+          <h4 data-i18n="welcomeTitle">Welcome to VibeSurf</h4>
+          <p data-i18n="welcomeSubtitle">Let's vibe surfing the world with AI automation</p>
         </div>
         <div id="weather-widget"></div>
       </div>
@@ -1602,22 +1619,27 @@ class VibeSurfUIManager {
     if (this.elements.activityLog) {
       // Preserve the news carousel
       const newsCarousel = this.elements.activityLog.querySelector('#news-carousel-container');
-      
+
       // Set the welcome message
       this.elements.activityLog.innerHTML = welcomeHTML;
-      
+
       // Re-initialize weather manager with new container
       if (this.weatherManager) {
         setTimeout(() => {
           this.weatherManager.checkContainer();
         }, 0);
       }
-      
+
       // Append the news carousel at the end (after welcome message)
       if (newsCarousel) {
         this.elements.activityLog.appendChild(newsCarousel);
       }
-      
+
+      // Translate the welcome message elements to the current language
+      if (window.i18n && window.i18n.translatePage) {
+        window.i18n.translatePage(this.elements.activityLog);
+      }
+
       this.bindTaskSuggestionEvents();
     }
   }
@@ -2385,11 +2407,15 @@ class VibeSurfUIManager {
     const select = this.elements.llmProfileSelect;
     select.innerHTML = '';
 
+    // Get translated messages
+    const noLlmProfilesLabel = window.i18n?.getMessage('noLlmProfilesConfigured') || 'No LLM profiles configured - Go to Settings';
+    const selectLlmProfileLabel = window.i18n?.getMessage('selectLlmProfile') || 'Select LLM Profile...';
+
     if (profiles.length === 0) {
       // Add placeholder option when no profiles available
       const placeholderOption = document.createElement('option');
       placeholderOption.value = '';
-      placeholderOption.textContent = 'No LLM profiles configured - Go to Settings';
+      placeholderOption.textContent = noLlmProfilesLabel;
       placeholderOption.disabled = true;
       placeholderOption.selected = true;
       select.appendChild(placeholderOption);
@@ -2397,7 +2423,7 @@ class VibeSurfUIManager {
       // Add default empty option
       const emptyOption = document.createElement('option');
       emptyOption.value = '';
-      emptyOption.textContent = 'Select LLM Profile...';
+      emptyOption.textContent = selectLlmProfileLabel;
       emptyOption.disabled = true;
       select.appendChild(emptyOption);
 
