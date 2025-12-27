@@ -11,7 +11,11 @@ VibeSurf is an AI agentic browser built with Python (backend) and React/TypeScri
 - Frontend: React 18, TypeScript, Vite, Tailwind CSS, XYFlow (ReactFlow)
 - Browser: Chrome DevTools Protocol (CDP), Playwright
 - Python: 3.11+ (recommended 3.12)
-- Package Manager: uv (0.7.20)
+- Package Manager: uv (0.7.20+)
+
+**Version Info:**
+- Chrome Extension: 0.1.44.127
+- Frontend (Langflow): 1.6.4
 
 ## Development Commands
 
@@ -121,6 +125,29 @@ The FastAPI backend (`vibe_surf/backend/main.py`) is organized into routers:
 - Manifest V3 with side panel UI
 - WebSocket communication with backend
 - Background service worker + content scripts
+- **i18n Support**: Multi-language support (English, Simplified Chinese)
+
+### Internationalization (i18n)
+
+**Chrome Extension Localization:**
+- Location: `vibe_surf/chrome_extension/_locales/`
+- Supported languages: `en` (English), `zh_CN` (Simplified Chinese)
+- Auto-detection: IP-based language detection on first load
+- Translation keys: Defined in `messages.json` for each locale
+- Helper script: `vibe_surf/chrome_extension/scripts/i18n-helper.js`
+
+**Adding New Translations:**
+1. Create new locale directory: `_locales/{locale_code}/`
+2. Add `messages.json` with translation keys
+3. Update `manifest.json` `default_locale` if needed
+4. Use `chrome.i18n.getMessage()` in JavaScript
+
+**Example usage:**
+```javascript
+// In extension scripts
+const title = chrome.i18n.getMessage("extensionName");
+const description = chrome.i18n.getMessage("extensionDescription");
+```
 
 ### Langflow Integration
 
@@ -136,6 +163,7 @@ VibeSurf embeds a fork of Langflow for visual workflow creation:
 
 Pre-built workflow templates in `vibe_surf/workflows/`:
 - Categories: AIGC, Browser, FileSystem, Integrations, VibeSurf
+- 80+ pre-built workflows available
 - Combine deterministic automation with AI intelligence
 - Minimize token consumption for repetitive tasks
 
@@ -146,7 +174,7 @@ Pre-built workflow templates in `vibe_surf/workflows/`:
 - `vibesurf_tools.py` - Search, crawl, JS code execution
 - `file_system.py` - File operations
 - `composio_client.py` - Integration with external apps
-- `website_api/` - Native APIs for social platforms (Xiaohongshu, Douyin, Weibo, YouTube)
+- `website_api/` - Native APIs for social platforms (Xiaohongshu, Douyin, Weibo, YouTube, Zhihu, NewsNow)
 - `aigc/` - AI generation tools
 
 **Skills** are higher-level capabilities registered via `/api/skill`:
@@ -173,6 +201,11 @@ Multi-provider architecture with unified interface:
 - IBM WatsonX, Groq, Cohere, HuggingFace
 
 Configuration via environment variables or LLMProfile database records.
+
+**LLM Factory** (`vibe_surf/backend/utils/llm_factory.py`):
+- Centralized LLM client creation
+- Provider-specific configuration handling
+- Support for custom API endpoints
 
 ## Environment Configuration
 
@@ -226,13 +259,23 @@ Tools follow LangChain's structured tool pattern:
 - WebSocket for streaming agent outputs
 - Server-Sent Events (SSE) for workflow execution updates
 
+### Welcome Flow
+
+**New User Onboarding:**
+- Welcome modal with feature introduction
+- GitHub star prompt modal
+- IP-based language auto-detection
+- Settings guidance for first-time setup
+
+**Location**: `vibe_surf/browser/welcome_modal_content.py`
+
 ## Common Workflows
 
 ### Adding a New LLM Provider
 
 1. Create provider client in `vibe_surf/llm/`
 2. Add to LLMProfile enum in `vibe_surf/backend/database/models.py`
-3. Update provider factory in relevant agent code
+3. Update provider factory in `vibe_surf/backend/utils/llm_factory.py`
 4. Add API key to `.env.example`
 
 ### Creating a Custom Tool
@@ -249,6 +292,13 @@ Tools follow LangChain's structured tool pattern:
 3. Test in workflow builder UI
 4. Export and commit workflow file
 
+### Adding Extension i18n Support
+
+1. Add translation key to `_locales/en/messages.json`
+2. Add translation to `_locales/zh_CN/messages.json`
+3. Use `chrome.i18n.getMessage("keyName")` in scripts
+4. Test extension in different languages
+
 ## Testing
 
 **Frontend Tests:**
@@ -260,7 +310,11 @@ npm run test:watch          # Watch mode
 ```
 
 **Backend Tests:**
-No pytest configuration found - tests likely run via individual test files or manual testing.
+```bash
+# Run specific test files
+pytest tests/test_agents.py
+pytest tests/test_aigc_tools.py
+```
 
 ## Platform-Specific Notes
 
@@ -277,6 +331,10 @@ No pytest configuration found - tests likely run via individual test files or ma
 **Docker:**
 - Set `IN_DOCKER=true` for optimized browser configuration
 - Playwright browsers need proper installation in container
+
+**macOS:**
+- torch on Mac Intel requires specific configuration
+- Recent fix: commit f9c498a "fix torch on mac intel"
 
 ## Debugging
 
@@ -308,9 +366,16 @@ vibe_surf/
 ├── backend/             # FastAPI server
 │   ├── api/            # API routers
 │   ├── database/       # SQLAlchemy models
+│   ├── utils/         # Utility functions (encryption, llm_factory)
 │   └── frontend/       # Built React app (copied from vibe_surf/frontend/build)
 ├── browser/            # Browser management
+│   └── welcome_modal_content.py  # Welcome flow content
 ├── chrome_extension/   # Chrome extension (Manifest V3)
+│   ├── _locales/      # i18n translations (en, zh_CN)
+│   ├── scripts/       # Extension scripts
+│   │   ├── i18n-helper.js     # i18n utilities
+│   │   └── ...
+│   └── styles/        # Extension styles
 ├── frontend/           # React TypeScript app (source)
 ├── langflow/          # Workflow builder (Langflow fork)
 │   ├── alembic/       # Database migrations
@@ -318,10 +383,18 @@ vibe_surf/
 │   └── services/      # Langflow backend services
 ├── llm/               # LLM provider integrations
 ├── tools/             # Agent tools
-├── workflows/         # Pre-built workflow templates
+│   ├── website_api/   # Platform-specific APIs
+│   └── aigc/         # AI generation tools
+├── workflows/         # Pre-built workflow templates (80+)
 ├── cli.py            # CLI entry point
 └── common.py         # Shared utilities
 ```
+
+## Documentation
+
+- **English Guide**: See `README.md`
+- **Chinese Guide**: See `PROJECT_GUIDE_CN.md` and `README_zh.md`
+- **API Documentation**: Auto-generated by FastAPI at `/docs` endpoint
 
 ## Telemetry
 
@@ -342,3 +415,45 @@ ANONYMIZED_TELEMETRY=false
 - Version determined by git tags via `setuptools-scm`
 - Written to `vibe_surf/_version.py` on build
 - CLI displays version from `vibe_surf.__version__`
+
+## Recent Changes (2025-12)
+
+### Internationalization (i18n)
+- Added Chrome extension i18n support for English and Simplified Chinese
+- IP-based language auto-detection for new users
+- Translation files in `_locales/` directory
+- i18n helper utilities for extension scripts
+
+### UI Improvements
+- GitHub star prompt modal in welcome flow
+- Improved settings panels with better organization
+- Enhanced permission request UI
+- Better modal management and news carousel
+
+### Backend Enhancements
+- Improved VibeSurf API with better task management
+- Enhanced LLM factory with provider-specific configuration
+- Improved encryption utilities for API keys
+- Streamlined browser session management
+
+### Testing
+- Added AIGC tools tests
+- Improved agent tests coverage
+
+### Documentation
+- Added comprehensive Chinese project guide (`PROJECT_GUIDE_CN.md`)
+- Updated README files with latest features
+- Improved i18n translation coverage
+
+## Contributing
+
+When contributing to VibeSurf:
+1. Follow existing code patterns and architecture
+2. Add i18n strings for any new UI text
+3. Update tests for new features
+4. Ensure cross-platform compatibility (Windows, macOS, Linux)
+5. Document new tools and workflows
+
+## License
+
+Apache-2.0 License - See LICENSE file for details
