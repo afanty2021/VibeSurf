@@ -105,7 +105,8 @@ The FastAPI backend (`vibe_surf/backend/main.py`) is organized into routers:
 - `/api/browser` - Browser control and session management
 - `/api/config` - LLM and voice profile configuration
 - `/api/composio` - Third-party app integrations (100+ tools)
-- `/api/skill` - AI skills registry (search, crawl, code execution)
+- `/api/skill` - AI skills registry (search, crawl, code execution) + Workflow skill configuration
+- `/api/tool` - Tool API for action search, parameter inspection, and execution
 - `/api/vibesurf` - Core VibeSurf operations
 - `/api/schedule` - Scheduled task management
 - `/api/files` - File operations
@@ -119,6 +120,10 @@ The FastAPI backend (`vibe_surf/backend/main.py`) is organized into routers:
 - Profile isolation per agent
 - Watchdog monitoring for health checks
 - Extension loading (when Chrome version < 142)
+- **Automatic tab cleanup** on task completion
+- **Optimized CDP session management** (redundant calls removed)
+- **Improved tab session handling** with better state tracking
+- **Extended launch timeout**: 300 seconds for slower systems
 
 **Extension Integration:**
 - Location: `vibe_surf/chrome_extension/`
@@ -162,25 +167,41 @@ VibeSurf embeds a fork of Langflow for visual workflow creation:
 ### Workflow System
 
 Pre-built workflow templates in `vibe_surf/workflows/`:
-- Categories: AIGC, Browser, FileSystem, Integrations, VibeSurf
+- Categories: AIGC, Browser, FileSystem, Integrations, Recruitment, VibeSurf
 - 80+ pre-built workflows available
 - Combine deterministic automation with AI intelligence
 - Minimize token consumption for repetitive tasks
+
+**Workflow Skills**:
+- Expose workflow inputs as configurable skills via API
+- Filter exposable inputs (not connected, not internal types)
+- Full UUID support for workflow identification
+- Search and filtering capabilities for skill discovery
 
 ### Tools and Skills
 
 **Core Tools** (`vibe_surf/tools/`):
 - `browser_use_tools.py` - Browser automation primitives
 - `vibesurf_tools.py` - Search, crawl, JS code execution
-- `file_system.py` - File operations
+- `file_system.py` - File operations with custom API directory support
 - `composio_client.py` - Integration with external apps
 - `website_api/` - Native APIs for social platforms (Xiaohongshu, Douyin, Weibo, YouTube, Zhihu, NewsNow)
 - `aigc/` - AI generation tools
+- `finance_tools.py` - Financial analysis tools
+- `voice_asr.py` - Voice recognition (ASR)
+
+**Tool API** (`/api/tool`):
+- `GET /search` - Search and filter actions by keyword from both vibesurf_tools and browser_use_tools
+- `GET /{action_name}/params` - Get parameter schema for a specific action
+- `POST /execute` - Execute an action with validated parameters
+- Actions from browser_use_tools are prefixed with "browser." for disambiguation
+- Automatic filtering of duplicate, internal, and unsafe actions
 
 **Skills** are higher-level capabilities registered via `/api/skill`:
 - `/search` - Quick information retrieval
 - `/crawl` - Website data extraction
 - `/code` - Execute JavaScript in browser context
+- **Workflow Skills**: Expose workflow inputs as configurable skills with search and filtering
 
 ### Database Models
 
@@ -271,6 +292,50 @@ Tools follow LangChain's structured tool pattern:
 
 ## Common Workflows
 
+### Using the Tool API
+
+The Tool API provides programmatic access to browser and VibeSurf actions:
+
+```bash
+# Search for available actions
+curl "http://localhost:9335/api/tool/search?keyword=screenshot"
+
+# Get parameter schema for a specific action
+curl "http://localhost:9335/api/tool/browser.screenshot/params"
+
+# Execute an action with parameters
+curl -X POST "http://localhost:9335/api/tool/execute" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action_name": "browser.screenshot",
+    "parameters": {}
+  }'
+```
+
+**Action Naming Convention:**
+- VibeSurf actions: `action_name` (e.g., `take_and_save_screenshot`)
+- Browser actions: `browser.action_name` (e.g., `browser.screenshot`)
+
+### Configuring Workflow Skills
+
+Expose workflow inputs as configurable skills:
+
+1. **Create a workflow** with input nodes
+2. **Configure skill exposure**:
+   ```bash
+   curl -X POST "http://localhost:9335/api/skill/expose" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "flow_id": "workflow-uuid",
+       "add_to_skill": true,
+       "workflow_expose_config": {
+         "input_field_1": true,
+         "input_field_2": false
+       }
+     }'
+   ```
+3. **Use the skill** through agent or direct API calls
+
 ### Adding a New LLM Provider
 
 1. Create provider client in `vibe_surf/llm/`
@@ -291,6 +356,7 @@ Tools follow LangChain's structured tool pattern:
 2. Use Langflow components from `vibe_surf/langflow/components/`
 3. Test in workflow builder UI
 4. Export and commit workflow file
+5. Optionally expose as a skill via `/api/skill/expose`
 
 ### Adding Extension i18n Support
 
@@ -364,8 +430,8 @@ python -m pdb -m vibe_surf.cli
 vibe_surf/
 ├── agents/              # AI agent implementations
 ├── backend/             # FastAPI server
-│   ├── api/            # API routers
-│   ├── database/       # SQLAlchemy models
+│   ├── api/            # API routers (task, agent, browser, tool, skill, etc.)
+│   ├── database/       # SQLAlchemy models and queries
 │   ├── utils/         # Utility functions (encryption, llm_factory)
 │   └── frontend/       # Built React app (copied from vibe_surf/frontend/build)
 ├── browser/            # Browser management
@@ -383,9 +449,21 @@ vibe_surf/
 │   └── services/      # Langflow backend services
 ├── llm/               # LLM provider integrations
 ├── tools/             # Agent tools
+│   ├── aigc/         # AI generation tools
 │   ├── website_api/   # Platform-specific APIs
-│   └── aigc/         # AI generation tools
+│   ├── browser_use_tools.py  # Browser automation primitives
+│   ├── vibesurf_tools.py     # VibeSurf search/crawl/code tools
+│   ├── file_system.py        # File operations with API directory
+│   ├── finance_tools.py      # Financial analysis tools
+│   ├── voice_asr.py          # Voice recognition
+│   └── views.py              # Action models and views
 ├── workflows/         # Pre-built workflow templates (80+)
+│   ├── AIGC/
+│   ├── Browser/
+│   ├── FileSystem/
+│   ├── Integrations/
+│   ├── Recruitment/    # NEW: Recruitment workflows
+│   └── VibeSurf/
 ├── cli.py            # CLI entry point
 └── common.py         # Shared utilities
 ```
@@ -416,25 +494,58 @@ ANONYMIZED_TELEMETRY=false
 - Written to `vibe_surf/_version.py` on build
 - CLI displays version from `vibe_surf.__version__`
 
-## Recent Changes (2025-12)
+## Recent Changes (2025-12 → 2026-01)
+
+### Tool API Enhancements
+- **New Tool API endpoints** (`/api/tool`):
+  - Action search with keyword filtering
+  - Parameter schema inspection for any action
+  - Direct action execution with validation
+- Browser actions prefixed with "browser." for clarity
+- Smart filtering of duplicate and unsafe actions
+- Custom API directory support at `{workspace}/apis`
+
+### Workflow Skills System
+- Expose workflow inputs as configurable skills
+- Input filtering based on connection status and type
+- Full UUID support instead of short IDs
+- Search and filtering for skill discovery
+- Validation of exposable inputs (no underscore prefixes, excludes HandleInput)
+
+### Browser Session Management
+- **Automatic tab cleanup** on task completion
+- **Refactored CDP session calls** - removed redundant operations
+- **Improved tab session handling** with better state tracking
+- **Extended browser launch timeout** to 300 seconds
+- Enhanced screenshot and input tools
+- Browser paste text workflow component added
 
 ### Internationalization (i18n)
 - Added Chrome extension i18n support for English and Simplified Chinese
 - IP-based language auto-detection for new users
 - Translation files in `_locales/` directory
 - i18n helper utilities for extension scripts
+- Improved modal and dialog translations
 
 ### UI Improvements
 - GitHub star prompt modal in welcome flow
+- **WeChat social link** with QR code popup in extension
 - Improved settings panels with better organization
 - Enhanced permission request UI
 - Better modal management and news carousel
+- Responsive form input fixes
 
 ### Backend Enhancements
 - Improved VibeSurf API with better task management
 - Enhanced LLM factory with provider-specific configuration
 - Improved encryption utilities for API keys
 - Streamlined browser session management
+- Better proxy configuration support
+
+### Error Handling
+- **Improved YouTube transcript error handling**
+- Enhanced API result processing
+- Better error messages and logging
 
 ### Testing
 - Added AIGC tools tests
@@ -444,6 +555,11 @@ ANONYMIZED_TELEMETRY=false
 - Added comprehensive Chinese project guide (`PROJECT_GUIDE_CN.md`)
 - Updated README files with latest features
 - Improved i18n translation coverage
+- Updated AI context documentation (this file)
+
+### New Workflow Category
+- **Recruitment** workflows added
+- Expanded workflow template library
 
 ## Contributing
 
