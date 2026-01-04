@@ -735,40 +735,40 @@
   },
 
   "scheduleWorkflow": {
-    "message": "计划工作流",
-    "description": "计划工作流模态框标题"
+    "message": "定时任务",
+    "description": "定时任务模态框标题"
   },
   "workflowName": {
     "message": "工作流名称",
     "description": "工作流名称标签"
   },
   "scheduleConfiguration": {
-    "message": "计划配置",
-    "description": "计划配置部分"
+    "message": "定时配置",
+    "description": "定时配置部分"
   },
   "scheduleType": {
-    "message": "计划类型",
-    "description": "计划类型标签"
+    "message": "定时类型",
+    "description": "定时类型标签"
   },
   "scheduleTypeDaily": {
     "message": "每天",
-    "description": "计划类型：每天"
+    "description": "定时类型：每天"
   },
   "scheduleTypeEveryXMinutes": {
     "message": "每 X 分钟",
-    "description": "计划类型：每 X 分钟"
+    "description": "定时类型：每 X 分钟"
   },
   "scheduleTypeEveryXHours": {
     "message": "每 X 小时",
-    "description": "计划类型：每 X 小时"
+    "description": "定时类型：每 X 小时"
   },
   "scheduleTypeWeekly": {
     "message": "每周",
-    "description": "计划类型：每周"
+    "description": "定时类型：每周"
   },
   "scheduleTypeMonthly": {
     "message": "每月",
-    "description": "计划类型：每月"
+    "description": "定时类型：每月"
   },
   "minuteInterval": {
     "message": "分钟间隔",
@@ -815,24 +815,80 @@
     "description": "月份日期帮助文本"
   },
   "enableSchedule": {
-    "message": "启用计划",
-    "description": "启用计划复选框标签"
+    "message": "启用定时",
+    "description": "启用定时复选框标签"
   },
   "enableScheduleHelp": {
-    "message": "取消选中可禁用计划而不删除它",
-    "description": "启用计划帮助文本"
+    "message": "取消选中可禁用定时任务而不删除它",
+    "description": "启用定时帮助文本"
   },
   "scheduleDescription": {
-    "message": "计划描述（可选）",
-    "description": "计划描述标签"
+    "message": "定时描述（可选）",
+    "description": "定时描述标签"
   },
   "scheduleDescriptionPlaceholder": {
     "message": "例如：每日数据同步、每周报告生成",
-    "description": "计划描述占位符"
+    "description": "定时描述占位符"
   },
   "saveSchedule": {
-    "message": "保存计划",
-    "description": "保存计划按钮"
+    "message": "保存定时",
+    "description": "保存定时按钮"
+  },
+  "workflowScheduleDisabled": {
+    "message": "定时任务已禁用",
+    "description": "定时任务禁用成功消息"
+  },
+  "workflowScheduleSaved": {
+    "message": "定时任务保存成功",
+    "description": "定时任务保存成功消息"
+  },
+  "scheduleEnabledRequired": {
+    "message": "请启用定时任务",
+    "description": "未启用定时任务时的错误消息"
+  },
+  "noActiveJob": {
+    "message": "无活动任务",
+    "description": "没有活动任务时显示"
+  },
+  "noActiveJobToShowLogs": {
+    "message": "无活动任务可显示日志",
+    "description": "没有活动任务时日志为空的消息"
+  },
+  "completed": {
+    "message": "已完成",
+    "description": "任务完成状态"
+  },
+  "noEventsAvailable": {
+    "message": "暂无可用事件",
+    "description": "日志为空时的标题"
+  },
+  "noEventsDescription": {
+    "message": "事件可能仍在处理中，或者此工作流尚未生成任何日志。",
+    "description": "日志为空时的描述"
+  },
+  "logsCleared": {
+    "message": "日志已清除",
+    "description": "日志清除后的消息"
+  },
+  "failedToLoadLogs": {
+    "message": "加载日志失败：{error}",
+    "description": "加载日志失败的消息",
+    "placeholders": {
+      "error": {
+        "content": "$1",
+        "example": "网络错误"
+      }
+    }
+  },
+  "failedToRefreshLogs": {
+    "message": "刷新日志失败：{error}",
+    "description": "刷新日志失败的消息",
+    "placeholders": {
+      "error": {
+        "content": "$1",
+        "example": "网络错误"
+      }
+    }
   },
   "saving": {
     "message": "正在保存...",
@@ -2408,6 +2464,10 @@
     "message": "输入架构",
     "description": "输入架构模态框标题"
   },
+  "searchInputs": {
+    "message": "按组件名称、字段名称或描述搜索...",
+    "description": "技能暴露模态框搜索输入占位符"
+  },
   "workflow": {
     "message": "工作流",
     "description": "工作流标签"
@@ -2431,18 +2491,6 @@
   "required": {
     "message": "必填",
     "description": "必填徽章文本"
-  },
-  "useMainSession": {
-    "message": "使用主浏览器会话",
-    "description": "使用主会话字段标签"
-  },
-  "browserTabId": {
-    "message": "浏览器标签页 ID",
-    "description": "浏览器标签页 ID 字段标签"
-  },
-  "targetId": {
-    "message": "目标 ID",
-    "description": "目标 ID 字段标签"
   },
   "noExposableInputs": {
     "message": "此工作流中没有可暴露的输入。",
@@ -2508,5 +2556,65 @@
   "openSettings": {
     "message": "打开设置",
     "description": "打开设置按钮"
+  },
+  "taskRunningPlaceholder": {
+    "message": "任务正在运行中，请稍候...",
+    "description": "任务运行时的占位符"
+  },
+  "taskPausedPlaceholder": {
+    "message": "添加更多信息或指导...",
+    "description": "任务暂停时的占位符"
+  },
+  "confirmStopRecording": {
+    "message": "录制正在进行中。您要停止并放弃吗?",
+    "description": "录制进行中关闭录制页面时的确认消息"
+  },
+  "deleteProfileTitle": {
+    "message": "删除配置",
+    "description": "删除配置模态框标题"
+  },
+  "deleteProfileConfirmation": {
+    "message": "确定要删除 $1 配置「$2」吗？此操作无法撤销。",
+    "description": "删除配置确认消息",
+    "placeholders": {
+      "type": {
+        "content": "$1",
+        "example": "llm"
+      },
+      "profileId": {
+        "content": "$2",
+        "example": "GPT-4"
+      }
+    }
+  },
+  "delete": {
+    "message": "删除",
+    "description": "删除按钮文本"
+  },
+  "selectNewDefaultProfile": {
+    "message": "选择新的默认配置",
+    "description": "选择新默认配置模态框标题"
+  },
+  "selectNewDefaultDescription": {
+    "message": "您正在删除默认的 LLM 配置。请选择一个新的默认配置：",
+    "description": "选择新默认配置描述"
+  },
+  "setAsDefaultAndDelete": {
+    "message": "设为默认并删除",
+    "description": "设为默认并删除按钮文本"
+  },
+  "disabledWhileTaskRunning": {
+    "message": "任务运行时已禁用",
+    "description": "任务执行期间文件附件被禁用时的工具提示"
+  },
+  "clickToLoadSession": {
+    "message": "点击加载会话：$1",
+    "description": "会话项点击操作的工具提示",
+    "placeholders": {
+      "sessionId": {
+        "content": "$1",
+        "example": "abc123"
+      }
+    }
   }
 }

@@ -46,6 +46,7 @@ from vibe_surf.backend.api.composio import router as composio_router
 from vibe_surf.backend.api.schedule import router as schedule_router
 from vibe_surf.backend.api.vibesurf import router as vibesurf_router
 from vibe_surf.backend.api.skill import router as skill_router
+from vibe_surf.backend.api.tool import router as tool_router
 from vibe_surf.backend import shared_state
 
 # Configure logging
@@ -337,6 +338,10 @@ def get_lifespan():
             await initialize_langflow_in_background()
             logger.info("🚀 Started Langflow initialization in background")
 
+            # Configure system proxies BEFORE any component initialization
+            from vibe_surf.backend.utils.utils import configure_system_proxies
+            configure_system_proxies()
+
             # Initialize telemetry and capture startup event
             telemetry = ProductTelemetry()
             import vibe_surf
@@ -588,6 +593,7 @@ def create_app() -> FastAPI:
     app.include_router(schedule_router, prefix="/api", tags=["schedule"])
     app.include_router(vibesurf_router, prefix="/api", tags=["vibesurf"])
     app.include_router(skill_router, prefix="/api", tags=["skill"])
+    app.include_router(tool_router, prefix="/api", tags=["tool"])
 
     @app.middleware("http")
     async def check_boundary(request: Request, call_next):

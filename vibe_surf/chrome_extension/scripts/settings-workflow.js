@@ -1775,18 +1775,18 @@ class VibeSurfSettingsWorkflow {
   // Show logs modal
   showLogsModal() {
     if (!this.elements.workflowLogsModal || !this.state.currentLogsWorkflow) return;
-    
+
     // Update modal title and info
     if (this.elements.logsModalTitle) {
-      this.elements.logsModalTitle.textContent = `Workflow Logs`;
+      this.elements.logsModalTitle.textContent = window.i18n.getMessage('workflowLogs');
     }
-    
+
     if (this.elements.logsWorkflowName) {
       this.elements.logsWorkflowName.textContent = this.state.currentLogsWorkflow.name;
     }
-    
+
     if (this.elements.logsJobId) {
-      this.elements.logsJobId.textContent = this.state.currentLogsJobId || 'No active job';
+      this.elements.logsJobId.textContent = this.state.currentLogsJobId || window.i18n.getMessage('noActiveJob');
     }
     
     // Show modal
@@ -1812,7 +1812,7 @@ class VibeSurfSettingsWorkflow {
       }
       
       if (!jobId) {
-        this.elements.logsContent.innerHTML = '<div class="log-entry info">No active job to show logs for</div>';
+        this.elements.logsContent.innerHTML = `<div class="log-entry info">${window.i18n.getMessage('noActiveJobToShowLogs')}</div>`;
         return;
       }
       
@@ -1862,7 +1862,7 @@ class VibeSurfSettingsWorkflow {
         } else if (cached.isComplete || cached.isPersistent) {
           // Update job info display to show completion status
           if (this.elements.logsJobId) {
-            this.elements.logsJobId.textContent = `${jobId} (Completed)`;
+            this.elements.logsJobId.textContent = `${jobId} (${window.i18n.getMessage('completed')})`;
           }
         }
       } else {
@@ -1906,7 +1906,7 @@ class VibeSurfSettingsWorkflow {
       
     } catch (error) {
       console.error('[SettingsWorkflow] Failed to load workflow logs:', error);
-      this.elements.logsContent.innerHTML = `<div class="log-entry error">Failed to load logs: ${error.message}</div>`;
+      this.elements.logsContent.innerHTML = `<div class="log-entry error">${window.i18n.getMessage('failedToLoadLogs', [error.message])}</div>`;
     } finally {
       if (this.elements.logsLoading) {
         this.elements.logsLoading.style.display = 'none';
@@ -1924,8 +1924,8 @@ class VibeSurfSettingsWorkflow {
       this.elements.logsContent.innerHTML = `
         <div class="log-empty-state">
           <div class="log-empty-icon">📋</div>
-          <div class="log-empty-title">No Events Available</div>
-          <div class="log-empty-description">Events may still be processing or this workflow hasn't generated any logs yet.</div>
+          <div class="log-empty-title">${window.i18n.getMessage('noEventsAvailable')}</div>
+          <div class="log-empty-description">${window.i18n.getMessage('noEventsDescription')}</div>
         </div>
       `;
       return;
@@ -2256,7 +2256,7 @@ class VibeSurfSettingsWorkflow {
       } catch (error) {
         console.error('[SettingsWorkflow] Failed to refresh logs:', error);
         this.emit('notification', {
-          message: `Failed to refresh logs: ${error.message}`,
+          message: window.i18n.getMessage('failedToRefreshLogs', [error.message]),
           type: 'error'
         });
       }
@@ -2266,7 +2266,7 @@ class VibeSurfSettingsWorkflow {
   // Handle logs clear
   handleLogsClear() {
     if (this.elements.logsContent) {
-      this.elements.logsContent.innerHTML = '<div class="log-entry info">Logs cleared</div>';
+      this.elements.logsContent.innerHTML = `<div class="log-entry info">${window.i18n.getMessage('logsCleared')}</div>`;
     }
   }
   
@@ -2285,7 +2285,7 @@ class VibeSurfSettingsWorkflow {
     
     // Update modal title and info
     if (this.elements.scheduleModalTitle) {
-      this.elements.scheduleModalTitle.textContent = 'Schedule Workflow';
+      this.elements.scheduleModalTitle.textContent = window.i18n.getMessage('scheduleWorkflow');
     }
     
     if (this.elements.scheduleWorkflowName) {
@@ -2618,23 +2618,23 @@ class VibeSurfSettingsWorkflow {
       // If schedule is disabled, remove it
       if (!isEnabled && this.state.currentScheduleWorkflow.schedule) {
         await this.apiClient.deleteSchedule(workflowId);
-        
+
         this.emit('notification', {
-          message: 'Workflow schedule disabled',
+          message: window.i18n.getMessage('workflowScheduleDisabled'),
           type: 'success'
         });
       } else if (this.scheduleState.cronExpression && isEnabled) {
         // Add/update schedule with new interface
         const descriptionInput = document.getElementById('schedule-description');
         const description = descriptionInput ? descriptionInput.value.trim() : '';
-        
+
         const scheduleData = {
           flow_id: workflowId,
           cron_expression: this.scheduleState.cronExpression,
           is_enabled: isEnabled,
           description: description
         };
-        
+
         if (this.state.currentScheduleWorkflow.schedule) {
           // Update existing schedule using flow_id
           await this.apiClient.updateSchedule(workflowId, scheduleData);
@@ -2642,15 +2642,15 @@ class VibeSurfSettingsWorkflow {
           // Create new schedule
           await this.apiClient.createSchedule(scheduleData);
         }
-        
+
         this.emit('notification', {
-          message: 'Workflow schedule saved successfully',
+          message: window.i18n.getMessage('workflowScheduleSaved'),
           type: 'success'
         });
       } else if (isEnabled) {
         // Enabled but no valid cron expression
         this.emit('notification', {
-          message: 'Please configure a valid schedule',
+          message: window.i18n.getMessage('scheduleEnabledRequired'),
           type: 'error'
         });
         return;
@@ -3447,7 +3447,7 @@ class VibeSurfSettingsWorkflow {
   handleRecordingPageClose() {
     if (this.recordingState.isRecording) {
       // Confirm before closing if recording
-      if (confirm('Recording is in progress. Do you want to stop and discard?')) {
+      if (confirm(window.i18n.getMessage('confirmStopRecording'))) {
         this.stopStepsPolling();
         chrome.runtime.sendMessage({ type: 'STOP_RECORDING' });
         this.hideRecordingPage();
@@ -3705,6 +3705,7 @@ class VibeSurfSettingsWorkflow {
     const workflowLabel = window.i18n?.getMessage('workflow') || 'Workflow';
     const cancelLabel = window.i18n?.getMessage('cancel') || 'Cancel';
     const saveLabel = window.i18n?.getMessage('save') || 'Save';
+    const searchPlaceholder = window.i18n?.getMessage('searchInputs') || 'Search by component name, field name, or description...';
 
     const modalHTML = `
       <div id="skill-expose-modal" class="modal hidden">
@@ -3722,6 +3723,16 @@ class VibeSurfSettingsWorkflow {
             <div class="skill-expose-workflow-name-container">
               <strong class="skill-expose-workflow-label">${workflowLabel}:</strong>
               <span class="skill-expose-workflow-name"></span>
+            </div>
+            <div class="skill-search-container">
+              <input type="text"
+                     id="skill-search-input"
+                     class="skill-search-input"
+                     placeholder="${searchPlaceholder}">
+              <svg class="skill-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+              </svg>
             </div>
             <div class="skill-expose-content"></div>
           </div>
@@ -3741,11 +3752,13 @@ class VibeSurfSettingsWorkflow {
     const cancelBtn = modal.querySelector('#skill-expose-cancel');
     const saveBtn = modal.querySelector('#skill-expose-save');
     const overlay = modal.querySelector('.modal-overlay');
+    const searchInput = modal.querySelector('#skill-search-input');
 
     if (closeBtn) closeBtn.addEventListener('click', () => this.hideSkillExposeModal());
     if (cancelBtn) cancelBtn.addEventListener('click', () => this.hideSkillExposeModal());
     if (saveBtn) saveBtn.addEventListener('click', () => this.saveSkillExposeConfig());
     if (overlay) overlay.addEventListener('click', () => this.hideSkillExposeModal());
+    if (searchInput) searchInput.addEventListener('input', (e) => this.handleSkillSearchInput(e.target.value));
 
     return modal;
   }
@@ -3762,22 +3775,23 @@ class VibeSurfSettingsWorkflow {
     const descriptionLabel = window.i18n?.getMessage('description') || 'Description';
     const currentValueLabel = window.i18n?.getMessage('currentValue') || 'Current Value';
     const requiredLabel = window.i18n?.getMessage('required') || 'required';
-    const useMainSessionLabel = window.i18n?.getMessage('useMainSession') || 'Use the main browser session';
-    const browserTabIdLabel = window.i18n?.getMessage('browserTabId') || 'Browser tab id';
-    const targetIdLabel = window.i18n?.getMessage('targetId') || 'Target ID';
 
     let html = '';
 
     for (const [componentId, componentData] of Object.entries(exposeConfig)) {
       const componentName = componentData.component_name || componentId;
+      const componentDescription = componentData.component_description || '';
       const inputs = componentData.inputs || {};
 
       if (Object.keys(inputs).length === 0) continue;
 
       html += `
-        <div class="skill-component-section">
+        <div class="skill-component-section" data-component-id="${componentId}">
           <div class="component-header" data-component-id="${componentId}">
-            <span class="component-name">${this.escapeHtml(componentName)}</span>
+            <div class="component-info">
+              <span class="component-id">${this.escapeHtml(componentId)}</span>
+              ${componentDescription ? `<span class="component-description">${this.escapeHtml(componentDescription)}</span>` : ''}
+            </div>
             <span class="component-collapse-icon">▼</span>
           </div>
           <div class="component-inputs">
@@ -3797,20 +3811,6 @@ class VibeSurfSettingsWorkflow {
         let displayName = inputData.display_name || inputName;
         let info = inputData.info || '';
 
-        // Translate common field names
-        if (displayName === 'Target ID') {
-          displayName = targetIdLabel;
-        } else if (displayName === 'Browser tab id') {
-          displayName = browserTabIdLabel;
-        } else if (displayName === 'Use Main Session') {
-          displayName = useMainSessionLabel;
-        }
-
-        // Translate common descriptions
-        if (info === 'Use the main browser session') {
-          info = useMainSessionLabel;
-        }
-
         const type = inputData.type || 'str';
         const isExpose = inputData.is_expose || false;
         const required = inputData.required;
@@ -3828,7 +3828,8 @@ class VibeSurfSettingsWorkflow {
         }
 
         html += `
-          <tr class="input-row">
+          <tr class="input-row"
+              data-search-text="${this.escapeHtml(componentId.toLowerCase())} ${this.escapeHtml(componentDescription.toLowerCase())} ${this.escapeHtml(displayName.toLowerCase())} ${this.escapeHtml(info.toLowerCase())}">
             <td class="col-expose">
               <label class="toggle-switch">
                 <input type="checkbox"
@@ -3867,7 +3868,7 @@ class VibeSurfSettingsWorkflow {
   hideSkillExposeModal() {
     const modal = document.getElementById('skill-expose-modal');
     if (!modal) return;
-    
+
     // Revert checkbox if canceling
     const flowId = modal.dataset.flowId;
     const checkbox = document.querySelector(`.skill-toggle-input[data-flow-id="${flowId}"]`);
@@ -3875,8 +3876,39 @@ class VibeSurfSettingsWorkflow {
       const workflow = this.state.workflows.find(w => w.flow_id === flowId);
       checkbox.checked = workflow ? workflow.add_to_skill : false;
     }
-    
+
     modal.classList.add('hidden');
+  }
+
+  // Handle skill search input
+  handleSkillSearchInput(searchQuery) {
+    const modal = document.getElementById('skill-expose-modal');
+    if (!modal) return;
+
+    const query = searchQuery.toLowerCase().trim();
+    const sections = modal.querySelectorAll('.skill-component-section');
+
+    sections.forEach(section => {
+      const rows = section.querySelectorAll('.input-row');
+      let hasVisibleRows = false;
+
+      rows.forEach(row => {
+        const searchText = row.dataset.searchText || '';
+        if (!query || searchText.includes(query)) {
+          row.style.display = '';
+          hasVisibleRows = true;
+        } else {
+          row.style.display = 'none';
+        }
+      });
+
+      // Hide the entire component section if no rows match
+      if (hasVisibleRows) {
+        section.style.display = '';
+      } else {
+        section.style.display = 'none';
+      }
+    });
   }
   
   // Save skill expose configuration

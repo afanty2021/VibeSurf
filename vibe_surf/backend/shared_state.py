@@ -22,6 +22,7 @@ from sqlalchemy import select, update
 from vibe_surf.agents.vibe_surf_agent import VibeSurfAgent
 from vibe_surf.tools.browser_use_tools import BrowserUseTools
 from vibe_surf.tools.vibesurf_tools import VibeSurfTools
+from vibe_surf.tools.browser_use_tools import BrowserUseTools
 from vibe_surf.browser.browser_manager import BrowserManager
 from browser_use.llm.base import BaseChatModel
 from browser_use.llm.openai.chat import ChatOpenAI
@@ -29,7 +30,6 @@ from browser_use.browser import BrowserProfile
 from vibe_surf.llm.openai_compatible import ChatOpenAICompatible
 from vibe_surf.browser.agent_browser_session import AgentBrowserSession
 from vibe_surf.browser.agen_browser_profile import AgentBrowserProfile
-from vibe_surf.backend.utils.utils import configure_system_proxies
 from vibe_surf.logger import get_logger
 
 logger = get_logger(__name__)
@@ -38,6 +38,7 @@ logger = get_logger(__name__)
 vibesurf_agent: Optional[VibeSurfAgent] = None
 browser_manager: Optional[BrowserManager] = None
 vibesurf_tools: Optional[VibeSurfTools] = None
+browser_use_tools: BrowserUseTools = BrowserUseTools()
 llm: Optional[BaseChatModel] = None
 db_manager: Optional['DatabaseManager'] = None
 current_llm_profile_name: Optional[str] = None
@@ -510,7 +511,7 @@ async def initialize_vibesurf_components():
         # Load environment variables
         workspace_dir = common.get_workspace_dir()
         logger.info("WorkSpace directory: {}".format(workspace_dir))
-        configure_system_proxies()
+        # Note: configure_system_proxies() is called earlier in main.py before ProductTelemetry initialization
         # Load environment configuration from envs.json
         envs_file_path = os.path.join(workspace_dir, "envs.json")
         try:

@@ -184,11 +184,11 @@ class VibeSurfUIManager {
 
     this.settingsManager.on('confirmDeletion', (data) => {
       this.modalManager.showConfirmModal(
-        'Delete Profile',
-        `Are you sure you want to delete the ${data.type} profile "${data.profileId}"? This action cannot be undone.`,
+        window.i18n.getMessage('deleteProfileTitle'),
+        window.i18n.getMessage('deleteProfileConfirmation', [data.type, data.profileId]),
         {
-          confirmText: 'Delete',
-          cancelText: 'Cancel',
+          confirmText: window.i18n.getMessage('delete'),
+          cancelText: window.i18n.getMessage('cancel'),
           type: 'danger',
           onConfirm: () => {
             if (data.callback) data.callback();
@@ -204,17 +204,17 @@ class VibeSurfUIManager {
 
       const modalData = this.modalManager.createModal(`
         <div class="select-default-modal">
-          <p>You are deleting the default LLM profile. Please select a new default profile:</p>
+          <p>${window.i18n.getMessage('selectNewDefaultDescription')}</p>
           <select id="new-default-select" class="form-select">
             ${options}
           </select>
           <div class="modal-footer">
-            <button class="btn-secondary cancel-btn">Cancel</button>
-            <button class="btn-primary confirm-btn">Set as Default & Delete</button>
+            <button class="btn-secondary cancel-btn">${window.i18n.getMessage('cancel')}</button>
+            <button class="btn-primary confirm-btn">${window.i18n.getMessage('setAsDefaultAndDelete')}</button>
           </div>
         </div>
       `, {
-        title: 'Select New Default Profile'
+        title: window.i18n.getMessage('selectNewDefaultProfile')
       });
 
       const select = document.getElementById('new-default-select');
@@ -315,7 +315,7 @@ class VibeSurfUIManager {
       } else {
         this.elements.voiceRecordBtn.classList.remove('recording');
         this.elements.voiceRecordBtn.setAttribute('title', 'Voice Input');
-        this.elements.voiceRecordBtn.setAttribute('data-tooltip', 'Click to start voice recording');
+        this.elements.voiceRecordBtn.setAttribute('data-tooltip', window.i18n?.getMessage('clickToStartVoiceRecording') || 'Click to start voice recording');
 
         // Clear duration display
         this.updateRecordingDuration('0:00', 0);
@@ -378,7 +378,7 @@ class VibeSurfUIManager {
       userMessage = `Recording failed: ${errorMessage}`;
     } else if (errorType === 'transcription') {
       if (errorMessage.includes('No active ASR profiles')) {
-        userMessage = 'No voice recognition profiles configured. Please set up an ASR profile in Settings > Voice.';
+        userMessage = window.i18n?.getMessage('noVoiceRecognitionProfilesConfigured') || 'No voice recognition profiles configured. Please set up an ASR profile in Settings > Voice.';
       } else {
         userMessage = `Transcription failed: ${errorMessage}`;
       }
@@ -652,11 +652,11 @@ class VibeSurfUIManager {
       // Allow input when paused or not running
       this.elements.taskInput.disabled = isRunning && !isPaused;
       if (isPaused) {
-        this.elements.taskInput.placeholder = 'Add additional information or guidance...';
+        this.elements.taskInput.placeholder = window.i18n?.getMessage('taskPausedPlaceholder') || 'Add additional information or guidance...';
       } else if (isRunning) {
-        this.elements.taskInput.placeholder = 'Task is running - please wait...';
+        this.elements.taskInput.placeholder = window.i18n?.getMessage('taskRunningPlaceholder') || 'Task is running - please wait...';
       } else {
-        this.elements.taskInput.placeholder = 'Ask anything (/ for skills, @ to specify tab)';
+        this.elements.taskInput.placeholder = window.i18n?.getMessage('inputPlaceholder') || 'Ask anything (/ for skills, @ to specify tab)';
       }
     }
 
@@ -687,7 +687,7 @@ class VibeSurfUIManager {
         if (this.elements.voiceRecordBtn.classList.contains('recording')) {
           this.elements.voiceRecordBtn.setAttribute('title', 'Recording... Click to stop');
         } else {
-          this.elements.voiceRecordBtn.setAttribute('title', 'Click to start voice recording');
+          this.elements.voiceRecordBtn.setAttribute('title', window.i18n?.getMessage('clickToStartVoiceRecording') || 'Click to start voice recording');
         }
       }
     }
@@ -734,7 +734,7 @@ class VibeSurfUIManager {
     if (this.elements.voiceRecordBtn) {
       this.elements.voiceRecordBtn.disabled = false;
       this.elements.voiceRecordBtn.classList.remove('task-running-disabled');
-      this.elements.voiceRecordBtn.setAttribute('title', 'Click to start voice recording');
+      this.elements.voiceRecordBtn.setAttribute('title', window.i18n?.getMessage('clickToStartVoiceRecording') || 'Click to start voice recording');
     }
 
     // Keep LLM profile disabled during pause (user doesn't need to change it)
@@ -2481,22 +2481,24 @@ class VibeSurfUIManager {
 
   showLLMProfileRequiredModal(action) {
     const isConfigureAction = action === 'configure';
-    const title = isConfigureAction ? 'LLM Profile Required' : 'Please Select LLM Profile';
+    const title = isConfigureAction
+      ? (window.i18n?.getMessage('llmProfileRequired') || 'LLM Profile Required')
+      : (window.i18n?.getMessage('pleaseSelectLlmProfile') || 'Please Select LLM Profile');
     const message = isConfigureAction
-      ? 'No LLM profiles are configured. You need to configure at least one LLM profile before sending tasks.'
-      : 'Please select an LLM profile from the dropdown to proceed with your task.';
+      ? (window.i18n?.getMessage('noLlmProfilesConfiguredDesc') || 'No LLM profiles are configured. You need to configure at least one LLM profile before sending tasks.')
+      : (window.i18n?.getMessage('pleaseSelectLlmProfileDesc') || 'Please select an LLM profile from the dropdown to proceed with your task.');
 
     const options = isConfigureAction
       ? {
-          confirmText: 'Open Settings',
-          cancelText: 'Cancel',
+          confirmText: window.i18n?.getMessage('openSettings') || 'Open Settings',
+          cancelText: window.i18n?.getMessage('cancel') || 'Cancel',
           onConfirm: () => {
             this.handleShowLLMSettings();
           }
         }
       : {
-          confirmText: 'OK',
-          cancelText: 'Open Settings',
+          confirmText: window.i18n?.getMessage('ok') || 'OK',
+          cancelText: window.i18n?.getMessage('openSettings') || 'Open Settings',
           onConfirm: () => {
             this.elements.llmProfileSelect?.focus();
           },
@@ -2510,22 +2512,24 @@ class VibeSurfUIManager {
 
   showVoiceProfileRequiredModal(action) {
     const isConfigureAction = action === 'configure';
-    const title = isConfigureAction ? 'Voice Profile Required' : 'Please Select Voice Profile';
+    const title = isConfigureAction
+      ? (window.i18n?.getMessage('voiceProfileRequired') || 'Voice Profile Required')
+      : (window.i18n?.getMessage('pleaseSelectVoiceProfile') || 'Please Select Voice Profile');
     const message = isConfigureAction
-      ? 'No voice recognition (ASR) profiles are configured. You need to configure at least one voice profile before using voice input.'
-      : 'Please configure a voice recognition profile to use voice input functionality.';
+      ? (window.i18n?.getMessage('noVoiceProfilesConfiguredDesc') || 'No voice recognition (ASR) profiles are configured. You need to configure at least one voice profile before using voice input.')
+      : (window.i18n?.getMessage('pleaseConfigureVoiceProfileDesc') || 'Please configure a voice recognition profile to use voice input functionality.');
 
     const options = isConfigureAction
       ? {
-          confirmText: 'Open Voice Settings',
-          cancelText: 'Cancel',
+          confirmText: window.i18n?.getMessage('openVoiceSettings') || 'Open Voice Settings',
+          cancelText: window.i18n?.getMessage('cancel') || 'Cancel',
           onConfirm: () => {
             this.handleShowVoiceSettings();
           }
         }
       : {
-          confirmText: 'Open Voice Settings',
-          cancelText: 'Cancel',
+          confirmText: window.i18n?.getMessage('openVoiceSettings') || 'Open Voice Settings',
+          cancelText: window.i18n?.getMessage('cancel') || 'Cancel',
           onConfirm: () => {
             this.handleShowVoiceSettings();
           }
@@ -2695,14 +2699,14 @@ class VibeSurfUIManager {
       if (!isVoiceAvailable) {
         // Add visual indication but keep button enabled for click handling
         this.elements.voiceRecordBtn.classList.add('voice-disabled');
-        this.elements.voiceRecordBtn.setAttribute('title', 'Voice input disabled - No ASR profiles configured. Click to configure.');
-        this.elements.voiceRecordBtn.setAttribute('data-tooltip', 'Voice input disabled - No ASR profiles configured. Click to configure.');
+        this.elements.voiceRecordBtn.setAttribute('title', window.i18n?.getMessage('voiceInputDisabledNoAsr') || 'Voice input disabled - No ASR profiles configured. Click to configure.');
+        this.elements.voiceRecordBtn.setAttribute('data-tooltip', window.i18n?.getMessage('voiceInputDisabledNoAsr') || 'Voice input disabled - No ASR profiles configured. Click to configure.');
       } else {
         // Remove visual indication and restore normal tooltip
         this.elements.voiceRecordBtn.classList.remove('voice-disabled');
         if (!this.elements.voiceRecordBtn.classList.contains('recording')) {
-          this.elements.voiceRecordBtn.setAttribute('title', 'Click to start voice recording');
-          this.elements.voiceRecordBtn.setAttribute('data-tooltip', 'Click to start voice recording');
+          this.elements.voiceRecordBtn.setAttribute('title', window.i18n?.getMessage('clickToStartVoiceRecording') || 'Click to start voice recording');
+          this.elements.voiceRecordBtn.setAttribute('data-tooltip', window.i18n?.getMessage('clickToStartVoiceRecording') || 'Click to start voice recording');
         }
       }
     } catch (error) {
@@ -4059,7 +4063,7 @@ class VibeSurfUIManager {
         github: "https://github.com/vibesurf-ai/VibeSurf",
         discord: "https://discord.gg/86SPfhRVbk",
         x: "https://x.com/warmshao",
-        reportBug: "https://github.com/vibesurf-ai/VibeSurf/issues/new/choose",
+        wechat: "icons/wx.png",
         website: "https://vibe-surf.com/"
       };
     } else {
@@ -4169,14 +4173,14 @@ class VibeSurfUIManager {
           <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z" fill="currentColor"/>
         </svg>`;
         break;
-      
+
       case 'discord':
         title = 'Discord';
         svg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" fill="currentColor"/>
         </svg>`;
         break;
-      
+
       case 'x':
       case 'twitter':
         title = 'X (Twitter)';
@@ -4184,15 +4188,21 @@ class VibeSurfUIManager {
           <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" fill="currentColor"/>
         </svg>`;
         break;
-      
-      
-      case 'reportbug':
-        title = 'Report Bug';
-        svg = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M20 8h-2.81c-.45-.78-1.07-1.45-1.82-1.96L17 4.41 15.59 3l-2.17 2.17C12.96 5.06 12.49 5 12 5c-.49 0-.96.06-1.42.17L8.41 3 7 4.41l1.62 1.63C7.88 6.55 7.26 7.22 6.81 8H4v2h2.09c-.05.33-.09.66-.09 1v1H4v2h2v1c0 .34.04.67.09 1H4v2h2.81c1.04 1.79 2.97 3 5.19 3s4.15-1.21 5.19-3H20v-2h-2.09c.05-.33.09-.66.09-1v-1h2v-2h-2v-1c0-.34-.04-.67-.09-1H20V8zm-6 8h-4v-2h4v2zm0-4h-4v-2h4v2z" fill="currentColor"/>
+
+
+      case 'wechat':
+        title = 'WeChat Community';
+        svg = `<svg width="16" height="16" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M664.250054 368.541681c10.015098 0 19.892049 0.732687 29.67281 1.795902-26.647917-122.810047-159.358451-214.077703-310.826188-214.077703-169.353083 0-308.085774 114.232694-308.085774 259.274068 0 83.708494 46.165436 152.460344 123.281791 205.78483l-30.80868 91.730191 107.688651-53.455469c38.55292 7.53665 69.220511 15.308661 107.688651 15.308661 9.66308 0 19.230982-0.470721 28.752858-1.225921-6.025227-20.36584-9.521991-41.723264-9.521991-63.862493C402.328693 476.632491 517.908058 368.541681 664.250054 368.541681zM498.62897 285.87389c23.200398 0 38.55292 15.120372 38.55292 38.008387 0 22.559721-15.35252 38.174146-38.55292 38.174146-23.058305 0-46.259753-15.61447-46.259753-38.174146C452.369217 300.994262 475.570665 285.87389 498.62897 285.87389zM283.016307 362.056337c-23.058305 0-46.402633-15.61447-46.402633-38.174146 0-22.888015 23.344328-38.008387 46.402633-38.008387 23.200398 0 38.55292 15.120372 38.55292 38.008387C321.569227 346.441867 306.216705 362.056337 283.016307 362.056337z" fill="currentColor"/>
+          <path d="M945.448458 606.151333c0-121.888048-123.281791-221.236753-261.633065-221.236753-146.341996 0-262.062451 99.348706-262.062451 221.236753 0 122.06508 115.720455 221.379753 262.062451 221.379753 30.66159 0 61.41637-7.670801 92.029061-15.35252l84.441181 46.117458-23.202447-76.487448C899.379213 735.776599 945.448458 674.90384 945.448458 606.151333zM598.803483 567.994716c-15.35252 0-30.80868-15.26411-30.80868-30.66159 0-15.35252 15.45616-30.80868 30.80868-30.80868 23.058305 0 38.410827 15.45616 38.410827 30.80868C637.214309 552.730606 621.861788 567.994716 598.803483 567.994716zM768.25071 567.994716c-15.35252 0-30.66159-15.26411-30.66159-30.66159 0-15.35252 15.308661-30.80868 30.66159-30.80868 23.200398 0 38.55292 15.45616 38.55292 30.80868C806.803630 552.730606 791.451108 567.994716 768.25071 567.994716z" fill="currentColor"/>
         </svg>`;
+
+        // For WeChat, prevent default link behavior
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+        });
         break;
-      
+
       default:
         console.warn(`[UIManager] Unknown social platform: ${platform}`);
         return null;
@@ -4200,6 +4210,14 @@ class VibeSurfUIManager {
 
     link.setAttribute('title', title);
     link.innerHTML = svg;
+
+    // Add QR code popup for WeChat after setting innerHTML
+    if (platform.toLowerCase() === 'wechat') {
+      const qrPopup = document.createElement('div');
+      qrPopup.className = 'wechat-qr-popup';
+      qrPopup.innerHTML = `<img src="${url}" alt="WeChat QR Code" />`;
+      link.appendChild(qrPopup);
+    }
 
     return link;
   }

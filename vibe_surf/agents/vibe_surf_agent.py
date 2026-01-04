@@ -15,6 +15,7 @@ import shutil
 from typing import Any, Dict, List, Literal, Optional
 from uuid_extensions import uuid7str
 from collections import defaultdict
+import httpx
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.memory import MemorySaver
 from pydantic import BaseModel, Field
@@ -127,6 +128,33 @@ class VibeSurfState:
     stopped: bool = False
     should_pause: bool = False
     should_stop: bool = False
+
+
+async def detect_user_language() -> str:
+    """
+    Detect user's language based on IP location.
+    Returns 'zh_CN' for China (CN), 'en' for all other countries.
+    """
+    country_code = None
+    try:
+        async with httpx.AsyncClient(trust_env=False) as client:
+            response = await client.get("http://ipinfo.io/json", timeout=2.0)
+            if response.status_code == 200:
+                ip_data = response.json()
+                country_code = ip_data.get("country", "US")
+                logger.info(f"[VibeSurfAgent] Detected country from IP: {country_code}")
+            else:
+                country_code = "US"
+    except (httpx.TimeoutException, httpx.RequestError, ValueError) as e:
+        logger.warning(f"[VibeSurfAgent] Error detecting IP location (using default): {e}")
+        country_code = "US"
+
+    # Select language based on country code
+    # China (CN) uses Chinese, all others use English
+    if country_code == "CN":
+        return "zh_CN"
+    else:
+        return "en"
 
 
 def format_browser_results(browser_results: List[BrowserTaskResult]) -> str:
@@ -369,7 +397,7 @@ async def _vibesurf_agent_node_impl(state: VibeSurfState) -> VibeSurfState:
     # Create action model and agent output using VibeSurfTools
     vibesurf_agent = state.vibesurf_agent
 
-    vibesurf_action_names = vibesurf_agent.tools.get_all_action_names(exclude_actions=['mcp.', 'cpo.'])
+    vibesurf_action_names = vibesurf_agent.tools.get_all_action_names(exclude_actions=['mcp.', 'cpo.', 'get_browser_state'])
     ActionModel = vibesurf_agent.tools.registry.create_action_model(include_actions=vibesurf_action_names)
     if vibesurf_agent.settings.agent_mode == "thinking":
         AgentOutput = CustomAgentOutput.type_with_custom_actions(ActionModel)
@@ -427,7 +455,7 @@ async def _vibesurf_agent_node_impl(state: VibeSurfState) -> VibeSurfState:
         
         parsed_output_event = VibeSurfAgentParsedOutputEvent(
             version=vibe_surf.__version__,
-            parsed_output=json.dumps(parsed.model_dump(exclude_none=True, exclude_unset=True), ensure_ascii=False),  # Limit size
+            parsed_output='',  # Limit size
             action_count=1,
             action_types=action_types,
             model=getattr(vibesurf_agent.llm, 'model_name', None),
@@ -829,6 +857,9 @@ async def execute_single_browser_tasks(state: VibeSurfState) -> BrowserTaskResul
 
         step_callback = create_browser_agent_step_callback(state, agent_name)
         main_browser_session = state.vibesurf_agent.browser_manager.main_browser_session
+        created_new_tab = False
+        target_id = None
+
         if task_info.get("tab_id", None):
             tab_id = task_info.get("tab_id")
             target_id = await main_browser_session.get_target_id_from_tab_id(tab_id)
@@ -838,6 +869,7 @@ async def execute_single_browser_tasks(state: VibeSurfState) -> BrowserTaskResul
                 params={'url': 'chrome://newtab/'})
             target_id = new_target["targetId"]
             await main_browser_session.get_or_create_cdp_session(target_id=target_id)
+            created_new_tab = True
         agent = BrowserUseAgent(
             task=bu_task,
             llm=state.vibesurf_agent.llm,
@@ -900,6 +932,15 @@ async def execute_single_browser_tasks(state: VibeSurfState) -> BrowserTaskResul
         if state.vibesurf_agent and hasattr(state.vibesurf_agent, '_running_agents'):
             state.vibesurf_agent._running_agents.pop(agent_id, None)
             logger.debug(f"🔗 Unregistered single agent {agent_id} from control coordination")
+
+        # Cleanup browser tab if it was created for this task
+        if created_new_tab and target_id:
+            try:
+                root_client = main_browser_session.cdp_client
+                await root_client.send.Target.closeTarget(params={'targetId': target_id})
+                logger.debug(f"🧹 Closed browser tab {target_id} created for single task")
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to close browser tab {target_id}: {cleanup_error}")
 
 
 async def report_task_execution_node(state: VibeSurfState) -> VibeSurfState:
@@ -1685,10 +1726,15 @@ Please continue with your assigned work, incorporating this guidance only if it'
             }
             self.activity_logs.append(activity_entry)
 
+            # Version check with language detection
+            user_language = await detect_user_language()
             latest_version = await check_latest_vibesurf_version()
             current_version = get_vibesurf_version()
             if latest_version and latest_version != current_version:
-                update_msg = f'📦 Newer version of vibesurf available: {latest_version} (current: {current_version}). \nUpgrade with: \n`uv pip install vibesurf -U`\nor\nDownload [Windows Installer](https://github.com/vibesurf-ai/VibeSurf/releases/latest/download/VibeSurf-Installer.exe).\n\nYou can find more information at [release page](https://github.com/vibesurf-ai/VibeSurf/releases).'
+                if user_language == "zh_CN":
+                    update_msg = f'📦 新版 VibeSurf 可用: {latest_version} (当前: {current_version})。\n升级方式:\n`uv tool upgrade vibesurf`\n或\n下载 [Windows 安装程序](https://github.com/vibesurf-ai/VibeSurf/releases/latest/download/VibeSurf-Installer.exe)\n\n更多信息请访问 [发布页面](https://github.com/vibesurf-ai/VibeSurf/releases)。'
+                else:
+                    update_msg = f'📦 Newer version of vibesurf available: {latest_version} (current: {current_version}). \nUpgrade with: \n`uv tool upgrade vibesurf`\nor\nDownload [Windows Installer](https://github.com/vibesurf-ai/VibeSurf/releases/latest/download/VibeSurf-Installer.exe).\n\nYou can find more information at [release page](https://github.com/vibesurf-ai/VibeSurf/releases).'
                 logger.debug(update_msg)
                 activity_update_tip = {
                     "agent_name": 'System',
@@ -1740,7 +1786,7 @@ Please continue with your assigned work, incorporating this guidance only if it'
             completion_event = VibeSurfAgentTelemetryEvent(
                 version=vibe_surf.__version__,
                 action='task_completed',
-                task_description=task if task else None,
+                task_description=None,  # Privacy: removed user task description
                 model=getattr(self.llm, 'model_name', None),
                 model_provider=getattr(self.llm, 'provider', None),
                 duration_seconds=duration,
@@ -1774,12 +1820,12 @@ Please continue with your assigned work, incorporating this guidance only if it'
             error_event = VibeSurfAgentTelemetryEvent(
                 version=vibe_surf.__version__,
                 action='error',
-                task_description=BrowserTaskResult if task else None,
+                task_description=None,  # Privacy: removed user task description
                 model=getattr(self.llm, 'model_name', None),
                 model_provider=getattr(self.llm, 'provider', None),
                 duration_seconds=duration,
                 success=False,
-                error_message=str(e),  # Limit error message length
+                error_message=None,  # Privacy: removed error message
                 session_id=session_id
             )
             self.telemetry.capture(error_event)

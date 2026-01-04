@@ -29,7 +29,6 @@ from browser_use.tools.views import (
     InputTextAction,
     NoParamsAction,
     ScrollAction,
-    SearchAction,
     SelectDropdownOptionAction,
     SendKeysAction,
     StructuredOutputAction,
@@ -44,7 +43,7 @@ from browser_use.browser.views import BrowserError
 from browser_use.mcp.client import MCPClient
 
 from vibe_surf.browser.agent_browser_session import AgentBrowserSession
-from vibe_surf.tools.views import HoverAction, ExtractionAction, FileExtractionAction, DownloadMediaAction
+from vibe_surf.tools.views import SearchAction, HoverAction, ExtractionAction, FileExtractionAction, DownloadMediaAction, TakeScreenshotAction
 from vibe_surf.tools.mcp_client import CustomMCPClient
 from vibe_surf.tools.file_system import CustomFileSystem
 from vibe_surf.logger import get_logger
@@ -255,7 +254,7 @@ class BrowserUseTools(Tools, VibeSurfTools):
                 return ActionResult(error=error_msg)
 
         @self.registry.action(
-            '',
+            'Hover on an element.',
             param_model=HoverAction,
         )
         async def hover(params: HoverAction, browser_session: AgentBrowserSession):
@@ -488,12 +487,41 @@ class BrowserUseTools(Tools, VibeSurfTools):
 
         @self.registry.action(
             'Take a screenshot of the current page and save it to the file system',
-            param_model=NoParamsAction
+            param_model=TakeScreenshotAction
         )
-        async def take_screenshot(_: NoParamsAction, browser_session: AgentBrowserSession, file_system: FileSystem):
+        async def screenshot(params: TakeScreenshotAction, browser_session: AgentBrowserSession, file_system: FileSystem):
             try:
                 # Take screenshot using browser session
                 screenshot_bytes = await browser_session.take_screenshot()
+
+                # Apply crop if all crop parameters are provided
+                if params.crop_x1 is not None and params.crop_y1 is not None and params.crop_x2 is not None and params.crop_y2 is not None:
+                    from io import BytesIO
+                    from PIL import Image
+
+                    # Open image with PIL
+                    image = Image.open(BytesIO(screenshot_bytes))
+                    width, height = image.size
+
+                    # Convert relative coordinates (0-1) to pixel coordinates
+                    x1 = int(params.crop_x1 * width)
+                    y1 = int(params.crop_y1 * height)
+                    x2 = int(params.crop_x2 * width)
+                    y2 = int(params.crop_y2 * height)
+
+                    # Validate crop coordinates
+                    if x1 >= x2 or y1 >= y2:
+                        return ActionResult(error=f'Invalid crop coordinates: x1={x1}, y1={y1}, x2={x2}, y2={y2}')
+
+                    # Crop the image
+                    cropped_image = image.crop((x1, y1, x2, y2))
+
+                    # Save cropped image to bytes
+                    output = BytesIO()
+                    cropped_image.save(output, format='PNG')
+                    screenshot_bytes = output.getvalue()
+
+                    logger.info(f'Cropped screenshot: {x1},{y1},{x2},{y2} from {width}x{height}')
 
                 # Generate timestamp for filename
                 timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -508,7 +536,13 @@ class BrowserUseTools(Tools, VibeSurfTools):
                 # Save screenshot to file system
                 page_title = await browser_session.get_current_page_title()
                 page_title = sanitize_filename(page_title)
-                filename = f"{page_title}-{timestamp}.png"
+
+                # Add crop suffix to filename if cropped
+                crop_suffix = ""
+                if params.crop_x1 is not None:
+                    crop_suffix = f"_crop_{params.crop_x1}_{params.crop_y1}_{params.crop_x2}_{params.crop_y2}"
+
+                filename = f"{page_title}-{timestamp}{crop_suffix}.png"
                 filepath = screenshots_dir / filename
 
                 with open(filepath, "wb") as f:
@@ -596,5 +630,67 @@ class BrowserUseTools(Tools, VibeSurfTools):
 
             except Exception as e:
                 error_msg = f'❌ Failed to download media: {str(e)}'
+                logger.error(error_msg)
+                return ActionResult(error=error_msg)
+
+        @self.registry.action(
+            'Get HTML content of current page and save to file',
+            param_model=NoParamsAction
+        )
+        async def get_html_content(_: NoParamsAction, browser_session: AgentBrowserSession, file_system: FileSystem):
+            """Get HTML content of current page and save to file"""
+            try:
+                # Wait for stable network
+                await browser_session._wait_for_stable_network(max_attempt=3)
+
+                # Get HTML content
+                html_content = await browser_session.get_html_content()
+
+                # Get file system directory
+                fs_dir = file_system.get_dir()
+
+                # Create htmls directory if it doesn't exist
+                htmls_dir = fs_dir / "htmls"
+                htmls_dir.mkdir(exist_ok=True)
+
+                # Generate filename with timestamp
+                timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                page_title = await browser_session.get_current_page_title()
+                page_title = sanitize_filename(page_title)
+                filename = f"{page_title}-{timestamp}.html"
+                filepath = htmls_dir / filename
+
+                # Save HTML content
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write(html_content)
+
+                msg = f'📄 HTML content saved to: {str(filepath.relative_to(fs_dir))}'
+                logger.info(msg)
+                return ActionResult(
+                    extracted_content=msg,
+                    include_in_memory=True,
+                    long_term_memory=f'Saved HTML content to {str(filepath.relative_to(fs_dir))}',
+                )
+            except Exception as e:
+                error_msg = f'❌ Failed to get HTML content: {str(e)}'
+                logger.error(error_msg)
+                return ActionResult(error=error_msg)
+
+        @self.registry.action(
+            'Refresh current page',
+            param_model=NoParamsAction
+        )
+        async def reload_page(_: NoParamsAction, browser_session: AgentBrowserSession):
+            """Reload the current page"""
+            try:
+                page = await browser_session.get_current_page()
+                await page.reload()
+
+                memory = 'Page reloaded'
+                msg = f'🔄 {memory}'
+                logger.info(msg)
+                return ActionResult(extracted_content=memory, include_in_memory=True, long_term_memory=memory)
+            except Exception as e:
+                error_msg = f'❌ Failed to reload page: {str(e)}'
                 logger.error(error_msg)
                 return ActionResult(error=error_msg)
