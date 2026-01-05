@@ -28,6 +28,7 @@
    7. [计划管理](#计划管理)
    8. [Composio集成](#composio集成)
    9. [语音管理](#语音管理)
+   10. [工具API](#工具api)
 4. [错误响应](#错误响应)
 5. [WebSocket API](#websocket-api)
 6. [客户端实现指南](#客户端实现指南)
@@ -1350,6 +1351,163 @@ GET /api/voices/{voice_profile_name}
 **Section sources**
 - [voices.py](file://vibe_surf/backend/api/voices.py#L1-L481)
 
+### 工具API
+
+工具API提供统一的接口用于搜索、检查参数和执行浏览器自动化操作及VibeSurf工具。该API整合了来自`browser_use_tools`和`vibesurf_tools`的所有操作，并提供一致的访问方式。
+
+#### 搜索操作
+
+```http
+GET /api/tool/search
+```
+
+**查询参数**:
+- `keyword`: 搜索关键词（可选）
+- `extra_tools`: 额外工具来源（可选）
+
+**响应**:
+```json
+{
+  "success": true,
+  "total_count": 50,
+  "actions": [
+    {
+      "action_name": "browser.screenshot",
+      "action_description": "Take a screenshot of the current page"
+    },
+    {
+      "action_name": "google_search",
+      "action_description": "Search on Google"
+    }
+  ]
+}
+```
+
+**说明**:
+- 浏览器操作名称以`browser.`前缀标识
+- 自动过滤重复、内部和不安全的操作
+- 支持关键词搜索进行快速定位
+
+#### 获取操作参数
+
+```http
+GET /api/tool/{action_name}/params
+```
+
+**路径参数**:
+- `action_name`: 操作名称（例如：`browser.screenshot`或`google_search`）
+
+**响应**:
+```json
+{
+  "success": true,
+  "action_name": "browser.screenshot",
+  "param_schema": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "string",
+        "description": "Save path for the screenshot"
+      }
+    },
+    "required": []
+  }
+}
+```
+
+**错误响应**:
+```json
+{
+  "success": false,
+  "error": "Action not found: unknown_action"
+}
+```
+
+#### 执行操作
+
+```http
+POST /api/tool/execute
+```
+
+**请求体**:
+```json
+{
+  "action_name": "browser.screenshot",
+  "parameters": {
+    "path": "/path/to/screenshot.png"
+  }
+}
+```
+
+**成功响应**:
+```json
+{
+  "success": true,
+  "action_name": "browser.screenshot",
+  "result": {
+    "screenshot_path": "/path/to/screenshot.png",
+    "timestamp": "2026-01-05T10:30:00Z"
+  }
+}
+```
+
+**错误响应**:
+```json
+{
+  "success": false,
+  "action_name": "browser.screenshot",
+  "error": "Failed to capture screenshot: browser not available"
+}
+```
+
+#### CDP日志操作
+
+**启动控制台日志记录**
+```http
+POST /api/tool/execute
+```
+
+**请求体**:
+```json
+{
+  "action_name": "browser.start_console_logging",
+  "parameters": {}
+}
+```
+
+**功能**:
+- 监控浏览器控制台消息（log、warn、error、info、debug）
+- 收集消息来源、级别、文本、URL、行号等信息
+- 用于调试JavaScript错误和跟踪应用状态
+
+**启动网络日志记录**
+```http
+POST /api/tool/execute
+```
+
+**请求体**:
+```json
+{
+  "action_name": "browser.start_network_logging",
+  "parameters": {}
+}
+```
+
+**功能**:
+- 监控网络请求和响应
+- 收集请求URL、方法、请求头、响应状态等信息
+- 用于API测试、性能分析和网络调试
+
+#### 操作命名规范
+
+- **浏览器操作**: `browser.action_name`（例如：`browser.screenshot`、`browser.start_console_logging`）
+- **VibeSurf操作**: `action_name`（例如：`google_search`、`take_and_save_screenshot`）
+
+**Section sources**
+- [tool.py](file://vibe_surf/backend/api/tool.py#L1-L200)
+- [browser_use_tools.py](file://vibe_surf/tools/browser_use_tools.py#L1-L500)
+- [vibesurf_tools.py](file://vibe_surf/tools/vibesurf_tools.py#L1-L300)
+
 ## 错误响应
 
 VibeSurf API使用标准的HTTP状态码来表示请求结果。以下是常见的错误响应格式：
@@ -1477,6 +1635,634 @@ const result = await client.submitTask(
     'openai-gpt4'
 );
 console.log(result);
+```
+
+### Go客户端示例
+
+```go
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+)
+
+type VibeSurfClient struct {
+	BaseURL    string
+	HTTPClient *http.Client
+}
+
+type SessionIDResponse struct {
+	SessionID string `json:"session_id"`
+	Timestamp string `json:"timestamp"`
+}
+
+type TaskSubmitRequest struct {
+	SessionID        string `json:"session_id"`
+	TaskDescription  string `json:"task_description"`
+	LLMProfileName   string `json:"llm_profile_name"`
+}
+
+func NewVibeSurfClient(baseURL string) *VibeSurfClient {
+	return &VibeSurfClient{
+		BaseURL:    baseURL,
+		HTTPClient: &http.Client{},
+	}
+}
+
+func (c *VibeSurfClient) GenerateSessionID() (string, error) {
+	resp, err := c.HTTPClient.Get(c.BaseURL + "/generate-session-id")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	var sessionResp SessionIDResponse
+	if err := json.Unmarshal(body, &sessionResp); err != nil {
+		return "", err
+	}
+
+	return sessionResp.SessionID, nil
+}
+
+func (c *VibeSurfClient) SubmitTask(sessionID, taskDescription, llmProfileName) (map[string]interface{}, error) {
+	payload := TaskSubmitRequest{
+		SessionID:       sessionID,
+		TaskDescription: taskDescription,
+		LLMProfileName:  llmProfileName,
+	}
+
+	jsonData, _ := json.Marshal(payload)
+	resp, err := c.HTTPClient.Post(
+		c.BaseURL+"/api/tasks/submit",
+		"application/json",
+		bytes.NewBuffer(jsonData),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	var result map[string]interface{}
+	json.Unmarshal(body, &result)
+
+	return result, nil
+}
+
+// 使用示例
+func main() {
+	client := NewVibeSurfClient("http://localhost:9335")
+	sessionID, _ := client.GenerateSessionID()
+
+	result, _ := client.SubmitTask(
+		sessionID,
+		"搜索最新的AI新闻",
+		"openai-gpt4",
+	)
+
+	fmt.Println(result)
+}
+```
+
+### Java客户端示例
+
+```java
+import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
+import java.util.UUID;
+
+public class VibeSurfClient {
+    private final String baseUrl;
+    private final HttpClient httpClient;
+
+    public VibeSurfClient(String baseUrl) {
+        this.baseUrl = baseUrl;
+        this.httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(10))
+            .build();
+    }
+
+    public String generateSessionId() throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(baseUrl + "/generate-session-id"))
+            .GET()
+            .build();
+
+        HttpResponse<String> response = httpClient.send(
+            request,
+            HttpResponse.BodyHandlers.ofString()
+        );
+
+        // Parse JSON (using Jackson or Gson)
+        // For simplicity, assuming manual parsing here
+        return parseSessionId(response.body());
+    }
+
+    public String submitTask(String sessionId, String taskDescription,
+                             String llmProfileName) throws IOException, InterruptedException {
+        String jsonBody = String.format(
+            "{\"session_id\":\"%s\",\"task_description\":\"%s\",\"llm_profile_name\":\"%s\"}",
+            sessionId, taskDescription, llmProfileName
+        );
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(baseUrl + "/api/tasks/submit"))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+            .build();
+
+        HttpResponse<String> response = httpClient.send(
+            request,
+            HttpResponse.BodyHandlers.ofString()
+        );
+
+        return response.body();
+    }
+
+    private String parseSessionId(String responseBody) {
+        // Implement JSON parsing
+        // Using: ObjectMapper (Jackson) or Gson
+        return "parsed-session-id";
+    }
+
+    // 使用示例
+    public static void main(String[] args) throws Exception {
+        VibeSurfClient client = new VibeSurfClient("http://localhost:9335");
+
+        String sessionId = client.generateSessionId();
+        String result = client.submitTask(
+            sessionId,
+            "搜索最新的AI新闻",
+            "openai-gpt4"
+        );
+
+        System.out.println(result);
+    }
+}
+```
+
+### C#客户端示例
+
+```csharp
+using System;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
+
+public class VibeSurfClient
+{
+    private readonly HttpClient _httpClient;
+    private readonly string _baseUrl;
+
+    public VibeSurfClient(string baseUrl = "http://localhost:9335")
+    {
+        _baseUrl = baseUrl;
+        _httpClient = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(30)
+        };
+    }
+
+    public async Task<string> GenerateSessionIdAsync()
+    {
+        var response = await _httpClient.GetAsync($"{_baseUrl}/generate-session-id");
+        response.EnsureSuccessStatusCode();
+
+        var content = await response.Content.ReadAsStringAsync();
+        var jsonDoc = JsonDocument.Parse(content);
+
+        return jsonDoc.RootElement.GetProperty("session_id").GetString();
+    }
+
+    public async Task<string> SubmitTaskAsync(string sessionId, string taskDescription, string llmProfileName)
+    {
+        var payload = new
+        {
+            session_id = sessionId,
+            task_description = taskDescription,
+            llm_profile_name = llmProfileName
+        };
+
+        var json = JsonSerializer.Serialize(payload);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.PostAsync($"{_baseUrl}/api/tasks/submit", content);
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadAsStringAsync();
+    }
+
+    // 使用示例
+    public static async Task Main(string[] args)
+    {
+        var client = new VibeSurfClient();
+
+        var sessionId = await client.GenerateSessionIdAsync();
+        var result = await client.SubmitTaskAsync(
+            sessionId,
+            "搜索最新的AI新闻",
+            "openai-gpt4"
+        );
+
+        Console.WriteLine(result);
+    }
+}
+```
+
+### Ruby客户端示例
+
+```ruby
+require 'net/http'
+require 'json'
+require 'uri'
+
+class VibeSurfClient
+  def initialize(base_url = 'http://localhost:9335')
+    @base_url = base_url
+    @uri = URI(base_url)
+  end
+
+  def generate_session_id
+    uri = URI("#{@base_url}/generate-session-id")
+    response = Net::HTTP.get_response(uri)
+
+    data = JSON.parse(response.body)
+    data['session_id']
+  end
+
+  def submit_task(session_id, task_description, llm_profile_name)
+    uri = URI("#{@base_url}/api/tasks/submit")
+    http = Net::HTTP.new(uri.host, uri.port)
+
+    request = Net::HTTP::Post.new(uri.path)
+    request['Content-Type'] = 'application/json'
+    request.body = {
+      session_id: session_id,
+      task_description: task_description,
+      llm_profile_name: llm_profile_name
+    }.to_json
+
+    response = http.request(request)
+    JSON.parse(response.body)
+  end
+end
+
+# 使用示例
+client = VibeSurfClient.new
+session_id = client.generate_session_id
+
+result = client.submit_task(
+  session_id,
+  '搜索最新的AI新闻',
+  'openai-gpt4'
+)
+
+puts result
+```
+
+### PHP客户端示例
+
+```php
+<?php
+
+class VibeSurfClient
+{
+    private string $baseUrl;
+    private ?array $lastError = null;
+
+    public function __construct(string $baseUrl = 'http://localhost:9335')
+    {
+        $this->baseUrl = rtrim($baseUrl, '/');
+    }
+
+    public function generateSessionId(): string
+    {
+        $url = $this->baseUrl . '/generate-session-id';
+        $response = $this->httpGet($url);
+        $data = json_decode($response, true);
+
+        if (isset($data['session_id'])) {
+            return $data['session_id'];
+        }
+
+        throw new RuntimeException('Failed to generate session ID');
+    }
+
+    public function submitTask(string $sessionId, string $taskDescription, string $llmProfileName): array
+    {
+        $url = $this->baseUrl . '/api/tasks/submit';
+        $payload = [
+            'session_id' => $sessionId,
+            'task_description' => $taskDescription,
+            'llm_profile_name' => $llmProfileName
+        ];
+
+        $response = $this->httpPost($url, $payload);
+        return json_decode($response, true);
+    }
+
+    private function httpGet(string $url): string
+    {
+        $options = [
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 30
+            ]
+        ];
+        $context = stream_context_create($options);
+        $result = @file_get_contents($url, false, $context);
+
+        if ($result === false) {
+            throw new RuntimeException("HTTP GET failed: $url");
+        }
+
+        return $result;
+    }
+
+    private function httpPost(string $url, array $data): string
+    {
+        $options = [
+            'http' => [
+                'method' => 'POST',
+                'header' => 'Content-Type: application/json',
+                'content' => json_encode($data),
+                'timeout' => 30
+            ]
+        ];
+        $context = stream_context_create($options);
+        $result = @file_get_contents($url, false, $context);
+
+        if ($result === false) {
+            throw new RuntimeException("HTTP POST failed: $url");
+        }
+
+        return $result;
+    }
+
+    public function getLastError(): ?array
+    {
+        return $this->lastError;
+    }
+}
+
+// 使用示例
+try {
+    $client = new VibeSurfClient();
+    $sessionId = $client->generateSessionId();
+
+    $result = $client->submitTask(
+        $sessionId,
+        '搜索最新的AI新闻',
+        'openai-gpt4'
+    );
+
+    print_r($result);
+} catch (Exception $e) {
+    echo "Error: " . $e->getMessage() . "\n";
+}
+?>
+```
+
+### Rust客户端示例
+
+```rust
+use reqwest::Client;
+use serde::{Deserialize, Serialize};
+use std::error::Error;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct SessionIdResponse {
+    session_id: String,
+    timestamp: String,
+}
+
+#[derive(Debug, Serialize)]
+struct TaskSubmitRequest {
+    session_id: String,
+    task_description: String,
+    llm_profile_name: String,
+}
+
+pub struct VibeSurfClient {
+    base_url: String,
+    client: Client,
+}
+
+impl VibeSurfClient {
+    pub fn new(base_url: &str) -> Result<Self, Box<dyn Error>> {
+        Ok(Self {
+            base_url: base_url.to_string(),
+            client: Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .build()?,
+        })
+    }
+
+    pub async fn generate_session_id(&self) -> Result<String, Box<dyn Error>> {
+        let url = format!("{}/generate-session-id", self.base_url);
+        let response = self.client.get(&url).send().await?;
+        let data: SessionIdResponse = response.json().await?;
+        Ok(data.session_id)
+    }
+
+    pub async fn submit_task(
+        &self,
+        session_id: &str,
+        task_description: &str,
+        llm_profile_name: &str,
+    ) -> Result<serde_json::Value, Box<dyn Error>> {
+        let url = format!("{}/api/tasks/submit", self.base_url);
+        let payload = TaskSubmitRequest {
+            session_id: session_id.to_string(),
+            task_description: task_description.to_string(),
+            llm_profile_name: llm_profile_name.to_string(),
+        };
+
+        let response = self
+            .client
+            .post(&url)
+            .json(&payload)
+            .send()
+            .await?;
+
+        let result: serde_json::Value = response.json().await?;
+        Ok(result)
+    }
+}
+
+// 使用示例
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let client = VibeSurfClient::new("http://localhost:9335")?;
+
+    let session_id = client.generate_session_id().await?;
+    let result = client
+        .submit_task(&session_id, "搜索最新的AI新闻", "openai-gpt4")
+        .await?;
+
+    println!("{:?}", result);
+    Ok(())
+}
+```
+
+### TypeScript客户端示例（类型安全）
+
+```typescript
+interface SessionIdResponse {
+  session_id: string;
+  timestamp: string;
+}
+
+interface TaskSubmitRequest {
+  session_id: string;
+  task_description: string;
+  llm_profile_name: string;
+}
+
+interface TaskSubmitResponse {
+  task_id: string;
+  status: string;
+  message?: string;
+}
+
+class VibeSurfClient {
+  constructor(private baseUrl: string = 'http://localhost:9335') {}
+
+  async generateSessionId(): Promise<string> {
+    const response = await fetch(`${this.baseUrl}/generate-session-id`);
+    const data: SessionIdResponse = await response.json();
+    return data.session_id;
+  }
+
+  async submitTask(
+    sessionId: string,
+    taskDescription: string,
+    llmProfileName: string
+  ): Promise<TaskSubmitResponse> {
+    const payload: TaskSubmitRequest = {
+      session_id: sessionId,
+      task_description: taskDescription,
+      llm_profile_name: llmProfileName
+    };
+
+    const response = await fetch(`${this.baseUrl}/api/tasks/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload)
+    });
+
+    return await response.json();
+  }
+
+  // 使用示例
+  static async main() {
+    const client = new VibeSurfClient();
+    const sessionId = await client.generateSessionId();
+
+    const result: TaskSubmitResponse = await client.submitTask(
+      sessionId,
+      '搜索最新的AI新闻',
+      'openai-gpt4'
+    );
+
+    console.log(result);
+  }
+}
+
+// 执行示例
+VibeSurfClient.main();
+```
+
+### 客户端库推荐
+
+虽然以上示例展示了如何直接使用HTTP API，但在生产环境中，建议使用以下成熟的HTTP客户端库：
+
+| 语言 | 推荐库 | 特点 |
+|------|--------|------|
+| **Python** | `httpx`, `requests` | 异步支持、简洁API |
+| **JavaScript/TypeScript** | `axios`, `fetch` | Promise支持、拦截器 |
+| **Go** | `net/http` (标准库), `resty` | 高性能、并发友好 |
+| **Java** | `OkHttp`, `HttpClient` (Java 11+) | 连接池、异步支持 |
+| **C#** | `HttpClient`, `RestSharp` | 异步/等待、类型安全 |
+| **Ruby** | `httparty`, `faraday` | DSL风格、中间件 |
+| **PHP** | `Guzzle`, `Symfony HttpClient` | PSR标准、中间件 |
+| **Rust** | `reqwest`, `surf` | 安全、高性能 |
+
+### WebSocket客户端示例
+
+VibeSurf支持WebSocket连接以获取实时任务更新：
+
+```javascript
+// JavaScript/TypeScript WebSocket客户端
+class VibeSurfWebSocketClient {
+  constructor(wsUrl = 'ws://localhost:9335/ws') {
+    this.ws = new WebSocket(wsUrl);
+    this.eventHandlers = new Map();
+  }
+
+  connect() {
+    this.ws.onopen = () => {
+      console.log('WebSocket connected');
+    };
+
+    this.ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      this.emit(data.type, data);
+    };
+
+    this.ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    this.ws.onclose = () => {
+      console.log('WebSocket disconnected');
+    };
+  }
+
+  on(event, handler) {
+    if (!this.eventHandlers.has(event)) {
+      this.eventHandlers.set(event, []);
+    }
+    this.eventHandlers.get(event).push(handler);
+  }
+
+  emit(event, data) {
+    const handlers = this.eventHandlers.get(event) || [];
+    handlers.forEach(handler => handler(data));
+  }
+
+  sendTaskUpdate(taskId, status) {
+    this.ws.send(JSON.stringify({
+      type: 'task_update',
+      task_id: taskId,
+      status: status
+    }));
+  }
+}
+
+// 使用示例
+const wsClient = new VibeSurfWebSocketClient();
+wsClient.connect();
+
+wsClient.on('task_progress', (data) => {
+  console.log('Task progress:', data.progress, '%');
+});
+
+wsClient.on('task_complete', (data) => {
+  console.log('Task completed:', data.result);
+});
 ```
 
 **Section sources**
